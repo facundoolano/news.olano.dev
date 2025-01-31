@@ -7,5 +7,5 @@ pub fn main() {
 
   feed_source.start("test url")
 
-  process.sleep(10_000)
+  process.sleep_forever()
 }
