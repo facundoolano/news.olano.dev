@@ -1,3 +1,4 @@
+import gleam/dict.{type Dict}
 import gleam/erlang/atom
 import gleam/erlang/charlist
 import gleam/erlang/process.{type Subject}
@@ -58,12 +59,39 @@ fn send_request() -> Result(List(String), httpc.HttpError) {
     ])
   let #(_, _, elements) = root
 
-  let entries =
-    list.filter(elements, fn(e) {
-      let #(tag, _, _) = e
-      charlist.to_string(tag) == "entry"
-    })
+  list.fold(elements, [], fn(acc, entry) {
+    let #(tag, _, elements) = entry
+
+    case charlist.to_string(tag) {
+      "entry" -> {
+        [parse_atom_entry(elements), ..acc]
+      }
+      _ -> acc
+    }
+  })
+  |> io.debug
+
   Ok(["ok"])
+}
+
+fn parse_atom_entry(elements: List(#(_, _, _))) -> Dict(String, String) {
+  list.fold(elements, dict.new(), fn(entry, element) {
+    let #(tag, attributes, content) = element
+    case charlist.to_string(tag), attributes, content {
+      "title", _, [title] ->
+        dict.insert(entry, "title", charlist.to_string(title))
+      "published", _, [published] ->
+        dict.insert(entry, "published", charlist.to_string(published))
+      "link", link_attrs, _ -> {
+        let link_attrs = dict.from_list(link_attrs)
+        case dict.get(link_attrs, charlist.from_string("href")) {
+          Ok(url) -> dict.insert(entry, "url", charlist.to_string(url))
+          _ -> entry
+        }
+      }
+      _, _, _ -> entry
+    }
+  })
 }
 
 @external(erlang, "erlsom", "simple_form")
