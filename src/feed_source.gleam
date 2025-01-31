@@ -59,6 +59,7 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
+      io.println("polling server")
       let state = case send_request(state.url) {
         Ok(entries) -> {
           State(..state, entries: entries)
