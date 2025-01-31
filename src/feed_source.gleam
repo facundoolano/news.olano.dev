@@ -11,62 +11,67 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 
-pub type ServerMessage {
-  PollFeed
-  GetEntries(client: Subject(List(Entry)))
+pub type Message {
+  PollFeed(Subject(Message))
+  GetEntries(Subject(List(Entry)))
 }
 
-pub type Feed {
-  Feed(url: String, entries: List(Entry), server: Subject(ServerMessage))
+pub type State {
+  State(url: String, entries: List(Entry), server: Subject(Message))
 }
 
 pub type Entry {
   Entry(title: String, url: String, publised: String)
 }
 
+// https://code-change.nl/gleam-blog/20230225-gleam-otp.html
 pub fn start(url: String) {
   // TODO consider extracting this init function
   let init = fn() {
-    let server = process.new_subject()
-    let state = Feed(url, [], server)
-    process.send(server, PollFeed)
+    let subject = process.new_subject()
+    let state = State(url, [], subject)
+    process.send(subject, PollFeed(subject))
 
-    let selector = process.new_selector()
+    let selector =
+      process.new_selector() |> process.selecting(subject, fn(x) { x })
 
     actor.Ready(state, selector)
   }
 
-  // TODO consider extracting this server function
-  let loop = fn(message: ServerMessage, state: Feed) {
-    case message {
-      GetEntries(client) -> {
-        process.send(client, state.entries)
-        actor.continue(state)
-      }
-      PollFeed -> {
-        let state = case send_request(state.url) {
-          Ok(entries) -> {
-            Feed(..state, entries: entries)
-          }
-          Error(msg) -> {
-            io.println("request error " <> string.inspect(msg))
-            state
-          }
-        }
-        process.send_after(state.server, 10_000, PollFeed)
-        actor.continue(state)
-      }
-    }
-  }
-
   let assert Ok(source) =
-    actor.start_spec(actor.Spec(init: init, loop: loop, init_timeout: 50))
+    actor.start_spec(actor.Spec(
+      init: init,
+      loop: handle_message,
+      init_timeout: 50,
+    ))
 
   source
 }
 
-pub fn entries(feed: Subject(ServerMessage)) -> List(Entry) {
-  actor.call(feed, GetEntries, 500)
+pub fn entries(feed: Subject(Message)) -> List(Entry) {
+  actor.call(feed, GetEntries(_), 10_000)
+}
+
+fn handle_message(message: Message, state: State) {
+  case message {
+    GetEntries(client) -> {
+      process.send(client, state.entries)
+      actor.continue(state)
+    }
+    PollFeed(self) -> {
+      let state = case send_request(state.url) {
+        Ok(entries) -> {
+          State(..state, entries: entries)
+        }
+        Error(msg) -> {
+          io.println("request error " <> string.inspect(msg))
+          state
+        }
+      }
+      process.send_after(self, 10_000, PollFeed(self))
+      actor.continue(state)
+    }
+  }
 }
 
 fn send_request(url: String) -> Result(List(Entry), httpc.HttpError) {
