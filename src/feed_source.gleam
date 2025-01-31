@@ -16,40 +16,37 @@ pub type Message {
   GetEntries(Subject(List(Entry)))
 }
 
-pub type State {
-  State(url: String, entries: List(Entry), server: Subject(Message))
-}
-
 pub type Entry {
   Entry(title: String, url: String, publised: String)
 }
 
-// https://code-change.nl/gleam-blog/20230225-gleam-otp.html
-pub fn start(url: String) {
-  // TODO consider extracting this init function
-  let init = fn() {
-    let subject = process.new_subject()
-    let state = State(url, [], subject)
-    process.send(subject, PollFeed(subject))
+type State {
+  State(url: String, entries: List(Entry), server: Subject(Message))
+}
 
-    let selector =
-      process.new_selector() |> process.selecting(subject, fn(x) { x })
-
-    actor.Ready(state, selector)
-  }
-
+pub fn start(url: String) -> Subject(Message) {
   let assert Ok(source) =
     actor.start_spec(actor.Spec(
-      init: init,
+      init: fn() { init(url) },
       loop: handle_message,
       init_timeout: 50,
     ))
-
   source
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
   actor.call(feed, GetEntries(_), 10_000)
+}
+
+fn init(url: String) {
+  let subject = process.new_subject()
+  let state = State(url, [], subject)
+  process.send(subject, PollFeed(subject))
+
+  let selector =
+    process.new_selector() |> process.selecting(subject, fn(x) { x })
+
+  actor.Ready(state, selector)
 }
 
 fn handle_message(message: Message, state: State) {
@@ -75,6 +72,8 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
+// TODO separate http from atom from domain specific Entry
+// TODO add rss support
 fn send_request(url: String) -> Result(List(Entry), httpc.HttpError) {
   let assert Ok(req) = request.to(url)
   use resp <- result.try(httpc.send(req))
