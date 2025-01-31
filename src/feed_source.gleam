@@ -1,7 +1,10 @@
+import gleam/erlang/atom
+import gleam/erlang/charlist
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
 import gleam/httpc
 import gleam/io
+import gleam/list
 import gleam/otp/actor
 import gleam/result
 import gleam/string
@@ -27,7 +30,11 @@ pub fn start(url: String) -> Subject(State) {
     let assert [head, ..] = state.entries
     let state = State(..state, entries: [head + 1, ..state.entries])
     case send_request() {
-      Ok(body) -> io.println(body)
+      Ok(body) -> {
+        io.debug(body)
+        // FIXME
+        Nil
+      }
       Error(msg) -> io.println("request error " <> string.inspect(msg))
     }
     process.send_after(subject, 10_000, state)
@@ -40,10 +47,24 @@ pub fn start(url: String) -> Subject(State) {
   source
 }
 
-fn send_request() -> Result(String, httpc.HttpError) {
+fn send_request() -> Result(List(String), httpc.HttpError) {
   let assert Ok(req) = request.to("https://olano.dev/feed.xml")
   use resp <- result.try(httpc.send(req))
   // TODO accept xml
   // TODO fail if error status
-  Ok(resp.body)
+  let #(_ok, root, _tail) =
+    parse_xml(resp.body, [
+      #(atom.create_from_string("nameFun"), fn(name, _, _) { name }),
+    ])
+  let #(_, _, elements) = root
+
+  let entries =
+    list.filter(elements, fn(e) {
+      let #(tag, _, _) = e
+      charlist.to_string(tag) == "entry"
+    })
+  Ok(["ok"])
 }
+
+@external(erlang, "erlsom", "simple_form")
+fn parse_xml(doc: String, options: List(a)) -> #(result, element, String)
