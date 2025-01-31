@@ -11,40 +11,52 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 
-pub type State {
-  Source(url: String, entries: List(Int))
+pub type ServerMessage {
+  PollFeed
+  GetEntries(client: Subject(List(Entry)))
+}
+
+pub type Feed {
+  Feed(url: String, entries: List(Entry), server: Subject(ServerMessage))
 }
 
 pub type Entry {
   Entry(title: String, url: String, publised: String)
 }
 
-pub fn start(url: String) -> Subject(State) {
+pub fn start(url: String) {
+  // TODO consider extracting this init function
   let init = fn() {
-    let subject = process.new_subject()
-    let state = Source(url, [1])
-    process.send(subject, state)
+    let server = process.new_subject()
+    let state = Feed(url, [], server)
+    process.send(server, PollFeed)
 
-    let selector =
-      process.new_selector() |> process.selecting(subject, fn(x) { x })
+    let selector = process.new_selector()
 
-    actor.Ready(subject, selector)
+    actor.Ready(state, selector)
   }
 
-  let loop = fn(state: State, subject) {
-    io.println("received message! " <> state.url)
-    let assert [head, ..] = state.entries
-    let state = Source(..state, entries: [head + 1, ..state.entries])
-    case send_request() {
-      Ok(body) -> {
-        io.debug(body)
-        // FIXME
-        Nil
+  // TODO consider extracting this server function
+  let loop = fn(message: ServerMessage, state: Feed) {
+    case message {
+      GetEntries(client) -> {
+        process.send(client, state.entries)
+        actor.continue(state)
       }
-      Error(msg) -> io.println("request error " <> string.inspect(msg))
+      PollFeed -> {
+        let state = case send_request(state.url) {
+          Ok(entries) -> {
+            Feed(..state, entries: entries)
+          }
+          Error(msg) -> {
+            io.println("request error " <> string.inspect(msg))
+            state
+          }
+        }
+        process.send_after(state.server, 10_000, PollFeed)
+        actor.continue(state)
+      }
     }
-    process.send_after(subject, 10_000, state)
-    actor.continue(subject)
   }
 
   let assert Ok(source) =
@@ -53,8 +65,12 @@ pub fn start(url: String) -> Subject(State) {
   source
 }
 
-fn send_request() -> Result(List(Entry), httpc.HttpError) {
-  let assert Ok(req) = request.to("https://olano.dev/feed.xml")
+pub fn entries(feed: Subject(ServerMessage)) -> List(Entry) {
+  actor.call(feed, GetEntries, 500)
+}
+
+fn send_request(url: String) -> Result(List(Entry), httpc.HttpError) {
+  let assert Ok(req) = request.to(url)
   use resp <- result.try(httpc.send(req))
   // TODO accept xml
   // TODO fail if error status

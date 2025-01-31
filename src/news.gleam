@@ -5,7 +5,15 @@ import gleam/io
 pub fn main() {
   io.println("Hello from news!")
 
-  feed_source.start("test url")
+  let feed = feed_source.start("https://olano.dev/feed.xml")
 
-  process.sleep_forever()
+  feed
+  |> feed_source.entries
+  |> io.debug
+
+  process.sleep(10_000)
+
+  feed
+  |> feed_source.entries
+  |> io.debug
 }
