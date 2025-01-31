@@ -21,7 +21,7 @@ pub type Entry {
 }
 
 type State {
-  State(url: String, entries: List(Entry), server: Subject(Message))
+  State(url: String, entries: List(Entry))
 }
 
 pub fn start(url: String) -> Subject(Message) {
@@ -40,9 +40,10 @@ pub fn entries(feed: Subject(Message)) -> List(Entry) {
 
 fn init(url: String) {
   let subject = process.new_subject()
-  let state = State(url, [], subject)
+  let state = State(url, [])
   process.send(subject, PollFeed(subject))
 
+  // I don't really understand what this means
   let selector =
     process.new_selector() |> process.selecting(subject, fn(x) { x })
 
