@@ -3,13 +3,13 @@ import gleam/io
 import gleam/otp/actor
 
 pub type State {
-  State(url: String, entries: List(String))
+  State(url: String, entries: List(Int))
 }
 
 pub fn start(url: String) -> Subject(State) {
   let init = fn() {
     let subject = process.new_subject()
-    let state = State(url, [])
+    let state = State(url, [1])
     process.send(subject, state)
 
     let selector =
@@ -20,6 +20,9 @@ pub fn start(url: String) -> Subject(State) {
 
   let loop = fn(state: State, subject) {
     io.println("received message! " <> state.url)
+    let assert [head, ..] = state.entries
+    let state = State(..state, entries: [head + 1, ..state.entries])
+    io.debug(state.entries)
     process.send_after(subject, 1000, state)
     actor.continue(subject)
   }
