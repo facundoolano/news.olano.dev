@@ -1,3 +1,4 @@
+import birl
 import gleam/dict
 import gleam/erlang/atom
 import gleam/erlang/charlist
@@ -17,7 +18,7 @@ pub type Message {
 }
 
 pub type Entry {
-  Entry(title: String, url: String, publised: String)
+  Entry(title: String, url: String, published: birl.Time)
 }
 
 type State {
@@ -67,7 +68,7 @@ fn handle_message(message: Message, state: State) {
           state
         }
       }
-      process.send_after(self, 10_000, PollFeed(self))
+      process.send_after(self, 30_000, PollFeed(self))
       actor.continue(state)
     }
   }
@@ -110,8 +111,9 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Option(Entry) {
       case element {
         #("title", _, [title]) ->
           dict.insert(entry, "title", charlist.to_string(title))
-        #("published", _, [published]) ->
+        #("published", _, [published]) -> {
           dict.insert(entry, "published", charlist.to_string(published))
+        }
         #("link", link_attrs, _) -> {
           dict.from_list(link_attrs)
           |> dict.get("href")
@@ -129,7 +131,12 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Option(Entry) {
     dict.get(values, "url"),
     dict.get(values, "published")
   {
-    Ok(title), Ok(url), Ok(published) -> Some(Entry(title, url, published))
+    Ok(title), Ok(url), Ok(published) -> {
+      case birl.parse(published) {
+        Ok(datetime) -> Some(Entry(title, url, datetime))
+        _ -> None
+      }
+    }
     _, _, _ -> None
   }
 }
