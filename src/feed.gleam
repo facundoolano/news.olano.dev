@@ -7,7 +7,6 @@ import gleam/http/request
 import gleam/httpc
 import gleam/io
 import gleam/list
-import gleam/option.{type Option}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
@@ -90,22 +89,21 @@ fn send_request(url: String) -> Result(List(Entry), httpc.HttpError) {
     ])
   let #(_, _, elements) = root
 
-  let entries =
-    list.fold(elements, [], fn(acc, entry) {
-      case entry {
-        #("entry", _, elements) -> {
-          parse_atom_entry(elements)
-          |> option.map(fn(entry) { [entry, ..acc] })
-          |> option.unwrap(acc)
-        }
-        _ -> acc
+  list.fold(elements, [], fn(acc, entry) {
+    case entry {
+      #("entry", _, elements) -> {
+        parse_atom_entry(elements)
+        |> result.map(fn(entry) { [entry, ..acc] })
+        |> result.unwrap(acc)
       }
-    })
-    |> list.reverse
-  Ok(entries)
+      _ -> acc
+    }
+  })
+  |> list.reverse
+  |> Ok
 }
 
-fn parse_atom_entry(elements: List(#(_, _, _))) -> Option(Entry) {
+fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
   let values =
     list.fold(elements, dict.new(), fn(entry, element) {
       case element {
@@ -125,14 +123,11 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Option(Entry) {
       }
     })
 
-  let entry = {
-    use title <- result.try(dict.get(values, "title"))
-    use url <- result.try(dict.get(values, "url"))
-    use published <- result.try(dict.get(values, "published"))
-    use datetime <- result.try(birl.parse(published))
-    Ok(Entry(title, url, datetime))
-  }
-  option.from_result(entry)
+  use title <- result.try(dict.get(values, "title"))
+  use url <- result.try(dict.get(values, "url"))
+  use published <- result.try(dict.get(values, "published"))
+  use datetime <- result.try(birl.parse(published))
+  Ok(Entry(title, url, datetime))
 }
 
 @external(erlang, "erlsom", "simple_form")
