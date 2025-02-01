@@ -7,7 +7,7 @@ import gleam/http/request
 import gleam/httpc
 import gleam/io
 import gleam/list
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
@@ -117,28 +117,22 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Option(Entry) {
         #("link", link_attrs, _) -> {
           dict.from_list(link_attrs)
           |> dict.get("href")
-          |> result.map(fn(url) {
-            dict.insert(entry, "url", charlist.to_string(url))
-          })
+          |> result.map(charlist.to_string)
+          |> result.map(fn(url) { dict.insert(entry, "url", url) })
           |> result.unwrap(entry)
         }
         #(_, _, _) -> entry
       }
     })
 
-  case
-    dict.get(values, "title"),
-    dict.get(values, "url"),
-    dict.get(values, "published")
-  {
-    Ok(title), Ok(url), Ok(published) -> {
-      case birl.parse(published) {
-        Ok(datetime) -> Some(Entry(title, url, datetime))
-        _ -> None
-      }
-    }
-    _, _, _ -> None
+  let entry = {
+    use title <- result.try(dict.get(values, "title"))
+    use url <- result.try(dict.get(values, "url"))
+    use published <- result.try(dict.get(values, "published"))
+    use datetime <- result.try(birl.parse(published))
+    Ok(Entry(title, url, datetime))
   }
+  option.from_result(entry)
 }
 
 @external(erlang, "erlsom", "simple_form")
