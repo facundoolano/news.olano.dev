@@ -108,16 +108,16 @@ fn init(name: String, url: String) {
 
   // if there's a previously cached file, parse it now and request alter
   // otherwise schedule to request now (after initialization)
-  let #(state, interval) = case simplifile.read(cache_dir <> name) {
+  let #(entries, interval) = case simplifile.read(cache_dir <> name) {
     Ok(body) -> {
       case parse_atom_feed(body) {
-        Ok(entries) -> #(State(name, url, entries), poll_interval_ms)
-        _ -> #(State(name, url, []), 0)
+        Ok(entries) -> #(entries, poll_interval_ms)
+        _ -> #([], 0)
       }
     }
-    _ -> #(State(name, url, []), 0)
+    _ -> #([], 0)
   }
-
+  let state = State(name, url, entries)
   process.send_after(subject, interval, PollFeed(subject))
 
   // I don't really understand what this means
