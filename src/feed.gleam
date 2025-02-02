@@ -69,7 +69,7 @@ pub fn entry_format(entry: Entry) {
 fn calc_bucket(entries: List(Entry)) -> Int {
   let by_date =
     list.sort(entries, by: fn(e1, e2) {
-      birl.compare(e2.published, e1.published)
+      birl.compare(e1.published, e2.published)
     })
 
   case list.first(by_date), list.last(by_date) {
