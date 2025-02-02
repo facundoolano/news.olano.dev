@@ -1,4 +1,3 @@
-import birl
 import feed
 import gleam/io
 import gleam/list
@@ -15,7 +14,7 @@ pub fn main() {
 
 fn loop(feeds) {
   list.flat_map(feeds, feed.entries)
-  |> list.sort(by: fn(e1, e2) { birl.compare(e2.published, e1.published) })
+  |> list.sort(by: feed.entry_compare)
   |> list.map(fn(e) { io.println(e.title <> "\n" <> e.url <> "\n") })
   // process.sleep(1000)
   // loop(feeds)
