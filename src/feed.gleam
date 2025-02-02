@@ -13,6 +13,7 @@ import gleam/order
 import gleam/otp/actor
 import gleam/result
 import gleam/string
+import simplifile
 
 pub type Message {
   PollFeed(Subject(Message))
@@ -27,13 +28,13 @@ pub type Entry {
 }
 
 type State {
-  State(url: String, entries: List(Entry))
+  State(name: String, url: String, entries: List(Entry))
 }
 
-pub fn start(url: String) -> Subject(Message) {
+pub fn start(name: String, url: String) -> Subject(Message) {
   let assert Ok(source) =
     actor.start_spec(actor.Spec(
-      init: fn() { init(url) },
+      init: fn() { init(name, url) },
       loop: handle_message,
       init_timeout: 50,
     ))
@@ -98,9 +99,9 @@ fn calc_bucket(entries: List(Entry)) -> Int {
   }
 }
 
-fn init(url: String) {
+fn init(name: String, url: String) {
   let subject = process.new_subject()
-  let state = State(url, [])
+  let state = State(name, url, [])
   process.send(subject, PollFeed(subject))
 
   // I don't really understand what this means
@@ -120,7 +121,7 @@ fn handle_message(message: Message, state: State) {
       io.println("polling server")
 
       // TODO refactor?
-      let state = case cached_fetch(state.url) {
+      let state = case cached_fetch(state.name, state.url) {
         Ok(body) -> {
           case parse_atom_feed(body) {
             Ok(entries) -> State(..state, entries: entries)
@@ -141,14 +142,34 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
-fn cached_fetch(url: String) -> Result(String, httpc.HttpError) {
-  // TODO try cache first
-  // TODO accept xml
-  let assert Ok(req) = request.to(url)
-  use resp <- result.try(httpc.send(req))
-  // TODO fail if error status
-  // TODO save to cache
-  Ok(resp.body)
+// FIXME refactor this, esp error handling. try recover?
+fn cached_fetch(name: String, url: String) -> Result(String, String) {
+  let dirpath = "./feedcache/"
+  let path = dirpath <> name
+
+  case simplifile.read(path) {
+    Ok(contents) -> Ok(contents)
+    _ -> {
+      use req <- result.try(result.replace_error(
+        request.to(url),
+        "request error",
+      ))
+      // TODO accept xml
+      use resp <- result.try(result.replace_error(
+        httpc.send(req),
+        "request error",
+      ))
+
+      case simplifile.create_directory_all(dirpath) {
+        Ok(Nil) -> {
+          simplifile.write(path, resp.body)
+        }
+        _ -> Ok(Nil)
+      }
+      // TODO fail if error status
+      Ok(resp.body)
+    }
+  }
 }
 
 // TODO add rss support

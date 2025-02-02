@@ -6,8 +6,8 @@ pub fn main() {
   io.println("Hello from news!")
 
   [
-    feed.start("https://olano.dev/feed.xml"),
-    feed.start("https://jorge.olano.dev/feed.xml"),
+    feed.start("olano.dev", "https://olano.dev/feed.xml"),
+    feed.start("jorge", "https://jorge.olano.dev/feed.xml"),
   ]
   |> loop
 }
