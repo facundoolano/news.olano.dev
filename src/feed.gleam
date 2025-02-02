@@ -19,6 +19,9 @@ pub type Message {
   GetEntries(Subject(List(Entry)))
 }
 
+// TODO consider moving to its own mod
+// TODO the bucket is more of an attr of the the feed, although it's more convenient to
+// set it in the entry for later access / ordering, may need to revisit this
 pub type Entry {
   Entry(title: String, url: String, published: birl.Time, freq_bucket: Int)
 }
@@ -51,6 +54,15 @@ pub fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
     // swap to get newer first
     result -> result
   }
+}
+
+pub fn entry_format(entry: Entry) {
+  entry.title
+  <> "("
+  <> entry.url
+  <> ")\n"
+  <> birl.legible_difference(birl.now(), entry.published)
+  <> "\n"
 }
 
 // TODO unit test this

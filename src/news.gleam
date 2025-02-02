@@ -15,7 +15,7 @@ pub fn main() {
 fn loop(feeds) {
   list.flat_map(feeds, feed.entries)
   |> list.sort(by: feed.entry_compare)
-  |> list.map(fn(e) { io.println(e.title <> "\n" <> e.url <> "\n") })
+  |> list.map(fn(e) { io.println(feed.entry_format(e)) })
   // process.sleep(1000)
   // loop(feeds)
 }
