@@ -15,6 +15,10 @@ import gleam/result
 import gleam/string
 import simplifile
 
+const poll_interval_ms = 3_600_000
+
+const cache_dir: String = "./feedcache"
+
 pub type Message {
   PollFeed(Subject(Message))
   GetEntries(Subject(List(Entry)))
@@ -101,8 +105,20 @@ fn calc_bucket(entries: List(Entry)) -> Int {
 
 fn init(name: String, url: String) {
   let subject = process.new_subject()
-  let state = State(name, url, [])
-  process.send(subject, PollFeed(subject))
+
+  // if there's a previously cached file, parse it now and request alter
+  // otherwise schedule to request now (after initialization)
+  let #(state, interval) = case simplifile.read(cache_dir <> name) {
+    Ok(body) -> {
+      case parse_atom_feed(body) {
+        Ok(entries) -> #(State(name, url, entries), poll_interval_ms)
+        _ -> #(State(name, url, []), 0)
+      }
+    }
+    _ -> #(State(name, url, []), 0)
+  }
+
+  process.send_after(subject, interval, PollFeed(subject))
 
   // I don't really understand what this means
   let selector =
@@ -121,7 +137,7 @@ fn handle_message(message: Message, state: State) {
       io.println("polling server")
 
       // TODO refactor?
-      let state = case cached_fetch(state.name, state.url) {
+      let state = case fetch(state.name, state.url, cache_to: cache_dir) {
         Ok(body) -> {
           case parse_atom_feed(body) {
             Ok(entries) -> State(..state, entries: entries)
@@ -136,16 +152,19 @@ fn handle_message(message: Message, state: State) {
           state
         }
       }
-      process.send_after(self, 30_000, PollFeed(self))
+      process.send_after(self, poll_interval_ms, PollFeed(self))
       actor.continue(state)
     }
   }
 }
 
 /// TODO explain
-fn cached_fetch(name: String, url: String) -> Result(String, String) {
-  let dirpath = "./feedcache/"
-  let path = dirpath <> name
+fn fetch(
+  name: String,
+  url: String,
+  cache_to cache_dir: String,
+) -> Result(String, String) {
+  let path = cache_dir <> name
 
   use _ <- result.try_recover(simplifile.read(path))
   use req <- result.try(result.replace_error(request.to(url), "request error"))
@@ -155,7 +174,7 @@ fn cached_fetch(name: String, url: String) -> Result(String, String) {
 
   // cache contents for next time
   let _ =
-    result.try(simplifile.create_directory_all(dirpath), fn(_) {
+    result.try(simplifile.create_directory_all(cache_dir), fn(_) {
       simplifile.write(path, resp.body)
     })
 
