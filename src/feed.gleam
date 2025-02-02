@@ -142,34 +142,24 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
-// FIXME refactor this, esp error handling. try recover?
+/// TODO explain
 fn cached_fetch(name: String, url: String) -> Result(String, String) {
   let dirpath = "./feedcache/"
   let path = dirpath <> name
 
-  case simplifile.read(path) {
-    Ok(contents) -> Ok(contents)
-    _ -> {
-      use req <- result.try(result.replace_error(
-        request.to(url),
-        "request error",
-      ))
-      // TODO accept xml
-      use resp <- result.try(result.replace_error(
-        httpc.send(req),
-        "request error",
-      ))
+  use _ <- result.try_recover(simplifile.read(path))
+  use req <- result.try(result.replace_error(request.to(url), "request error"))
+  // TODO accept xml
+  // TODO fail if error status
+  use resp <- result.try(result.replace_error(httpc.send(req), "request error"))
 
-      case simplifile.create_directory_all(dirpath) {
-        Ok(Nil) -> {
-          simplifile.write(path, resp.body)
-        }
-        _ -> Ok(Nil)
-      }
-      // TODO fail if error status
-      Ok(resp.body)
-    }
-  }
+  // cache contents for next time
+  let _ =
+    result.try(simplifile.create_directory_all(dirpath), fn(_) {
+      simplifile.write(path, resp.body)
+    })
+
+  Ok(resp.body)
 }
 
 // TODO add rss support
