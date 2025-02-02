@@ -58,7 +58,7 @@ pub fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
 
 pub fn entry_format(entry: Entry) {
   entry.title
-  <> "("
+  <> " ("
   <> entry.url
   <> ")\n"
   <> birl.legible_difference(birl.now(), entry.published)
@@ -118,9 +118,17 @@ fn handle_message(message: Message, state: State) {
     }
     PollFeed(self) -> {
       io.println("polling server")
-      let state = case send_request(state.url) {
-        Ok(entries) -> {
-          State(..state, entries: entries)
+
+      // TODO refactor?
+      let state = case cached_fetch(state.url) {
+        Ok(body) -> {
+          case parse_atom_feed(body) {
+            Ok(entries) -> State(..state, entries: entries)
+            Error(msg) -> {
+              io.println("request error " <> string.inspect(msg))
+              state
+            }
+          }
         }
         Error(msg) -> {
           io.println("request error " <> string.inspect(msg))
@@ -133,16 +141,20 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
-// TODO separate http from atom from domain specific Entry
-// TODO add rss support
-fn send_request(url: String) -> Result(List(Entry), httpc.HttpError) {
+fn cached_fetch(url: String) -> Result(String, httpc.HttpError) {
+  // TODO try cache first
+  // TODO accept xml
   let assert Ok(req) = request.to(url)
   use resp <- result.try(httpc.send(req))
-  // TODO accept xml
   // TODO fail if error status
+  // TODO save to cache
+  Ok(resp.body)
+}
 
+// TODO add rss support
+fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
   let #(_ok, root, _tail) =
-    parse_xml(resp.body, [
+    parse_xml(body, [
       #(atom.create_from_string("nameFun"), fn(name, _, _) {
         charlist.to_string(name)
       }),
