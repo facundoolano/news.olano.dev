@@ -104,20 +104,17 @@ fn calc_bucket(entries: List(Entry)) -> Int {
 }
 
 fn init(name: String, url: String) {
-  let subject = process.new_subject()
-
   // if there's a previously cached file, parse it now and request alter
   // otherwise schedule to request now (after initialization)
-  let #(entries, interval) = case simplifile.read(cache_dir <> name) {
-    Ok(body) -> {
-      case parse_atom_feed(body) {
-        Ok(entries) -> #(entries, poll_interval_ms)
-        _ -> #([], 0)
-      }
-    }
-    _ -> #([], 0)
-  }
+  let #(entries, interval) =
+    simplifile.read(cache_dir <> name)
+    |> result.replace_error(Nil)
+    |> result.try(parse_atom_feed)
+    |> result.map(fn(entries) { #(entries, poll_interval_ms) })
+    |> result.unwrap(or: #([], 0))
+
   let state = State(name, url, entries)
+  let subject = process.new_subject()
   process.send_after(subject, interval, PollFeed(subject))
 
   // I don't really understand what this means
