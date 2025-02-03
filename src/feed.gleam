@@ -17,7 +17,7 @@ import simplifile
 
 const poll_interval_ms = 3_600_000
 
-const cache_dir: String = "./feedcache"
+const cache_dir: String = "./feedcache/"
 
 pub type Message {
   PollFeed(Subject(Message))
@@ -40,7 +40,7 @@ pub fn start(name: String, url: String) -> Subject(Message) {
     actor.start_spec(actor.Spec(
       init: fn() { init(name, url) },
       loop: handle_message,
-      init_timeout: 50,
+      init_timeout: 2000,
     ))
   source
 }
@@ -131,8 +131,7 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      io.println("polling server")
-
+      io.println("polling " <> state.name)
       let maybe_entries =
         fetch(state.name, state.url, cache_to: cache_dir)
         |> result.replace_error(Nil)
@@ -176,13 +175,11 @@ fn fetch(
 }
 
 fn parse_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_ok, root, _tail) =
-    parse_xml(body, [
-      #(atom.create_from_string("nameFun"), fn(name, _, _) {
-        charlist.to_string(name)
-      }),
-    ])
-  let #(tag, _, _) = root
+  // parsing here just to check the tag, then parsing again in the internal atom/rss
+  // helpers because if I try to reuse the structure the type checker complaints
+  // about the differing structures of the two formats
+  // hacky but beats figuring out the gleam decoder stuff
+  let #(tag, _, _) = parse_xml_root(body)
 
   case tag {
     "feed" -> parse_atom_feed(body)
@@ -195,13 +192,8 @@ fn parse_feed(body: String) -> Result(List(Entry), Nil) {
 }
 
 fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_ok, root, _tail) =
-    parse_xml(body, [
-      #(atom.create_from_string("nameFun"), fn(name, _, _) {
-        charlist.to_string(name)
-      }),
-    ])
-  let #(_, _, elements) = root
+  let #(_, _, elements) = parse_xml_root(body)
+
   let assert [#(_, _, elements), ..] = elements
   list.fold(elements, [], fn(acc, entry) {
     case entry {
@@ -218,13 +210,7 @@ fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
 }
 
 fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_ok, root, _tail) =
-    parse_xml(body, [
-      #(atom.create_from_string("nameFun"), fn(name, _, _) {
-        charlist.to_string(name)
-      }),
-    ])
-  let #(_, _, root) = root
+  let #(_, _, root) = parse_xml_root(body)
   list.fold(root, [], fn(acc, entry) {
     case entry {
       #("entry", _, elements) -> {
@@ -287,6 +273,16 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
   use published <- result.try(dict.get(values, "published"))
   use datetime <- result.try(birl.parse(published))
   Ok(Entry(title, url, datetime, 0))
+}
+
+fn parse_xml_root(body: String) -> #(String, root1, root2) {
+  let #(_ok, root, _tail) =
+    parse_xml(body, [
+      #(atom.create_from_string("nameFun"), fn(name, _, _) {
+        charlist.to_string(name)
+      }),
+    ])
+  root
 }
 
 @external(erlang, "erlsom", "simple_form")
