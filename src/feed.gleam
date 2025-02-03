@@ -179,21 +179,12 @@ fn fetch(
 }
 
 fn parse_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_ok, root, _tail) =
-    parse_xml(body, [
-      #(atom.create_from_string("nameFun"), fn(name, _, _) {
-        charlist.to_string(name)
-      }),
-    ])
-  let #(tag, _, _) = root
-
-  case tag {
-    "feed" -> parse_atom_feed(body)
-    "rss" -> parse_rss_feed(body)
-    _ -> {
-      io.println("unknown feed type " <> tag)
-      Error(Nil)
-    }
+  // ideally, this would parse the xml once, check the shape and decide what format it is before proceeding to parse it
+  // buit trying that makes the type checker trip, since the dynamic xml yields different types on each format.
+  // so I'm going with a hacky check to decide if it's atom or rss, and defer the xml parsing in the form-specific functions
+  case string.contains(body, "<rss") {
+    True -> parse_rss_feed(body)
+    False -> parse_atom_feed(body)
   }
 }
 
