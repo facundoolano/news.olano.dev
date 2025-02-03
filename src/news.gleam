@@ -8,6 +8,7 @@ pub fn main() {
   [
     feed.start("olano.dev", "https://olano.dev/feed.xml"),
     feed.start("jorge", "https://jorge.olano.dev/feed.xml"),
+    feed.start("hackernews", "https://hnrss.org/best"),
   ]
   |> loop
 }

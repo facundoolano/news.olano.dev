@@ -109,7 +109,7 @@ fn init(name: String, url: String) {
   let #(entries, interval) =
     simplifile.read(cache_dir <> name)
     |> result.replace_error(Nil)
-    |> result.try(parse_atom_feed)
+    |> result.try(parse_feed)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.unwrap(or: #([], 0))
 
@@ -136,7 +136,7 @@ fn handle_message(message: Message, state: State) {
       // TODO refactor?
       let state = case fetch(state.name, state.url, cache_to: cache_dir) {
         Ok(body) -> {
-          case parse_atom_feed(body) {
+          case parse_feed(body) {
             Ok(entries) -> State(..state, entries: entries)
             Error(msg) -> {
               io.println("request error " <> string.inspect(msg))
@@ -178,8 +178,26 @@ fn fetch(
   Ok(resp.body)
 }
 
-// TODO add rss support
-fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
+fn parse_feed(body: String) -> Result(List(Entry), Nil) {
+  let #(_ok, root, _tail) =
+    parse_xml(body, [
+      #(atom.create_from_string("nameFun"), fn(name, _, _) {
+        charlist.to_string(name)
+      }),
+    ])
+  let #(tag, _, _) = root
+
+  case tag {
+    "feed" -> parse_atom_feed(body)
+    "rss" -> parse_rss_feed(body)
+    _ -> {
+      io.println("unknown feed type " <> tag)
+      Error(Nil)
+    }
+  }
+}
+
+fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
   let #(_ok, root, _tail) =
     parse_xml(body, [
       #(atom.create_from_string("nameFun"), fn(name, _, _) {
@@ -187,8 +205,30 @@ fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
       }),
     ])
   let #(_, _, elements) = root
-
+  let assert [#(_, _, elements), ..] = elements
   list.fold(elements, [], fn(acc, entry) {
+    case entry {
+      #("item", _, etc) -> {
+        parse_rss_entry(etc)
+        |> result.map(fn(entry) { [entry, ..acc] })
+        |> result.unwrap(acc)
+      }
+      _ -> acc
+    }
+  })
+  |> list.reverse
+  |> Ok
+}
+
+fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
+  let #(_ok, root, _tail) =
+    parse_xml(body, [
+      #(atom.create_from_string("nameFun"), fn(name, _, _) {
+        charlist.to_string(name)
+      }),
+    ])
+  let #(_, _, root) = root
+  list.fold(root, [], fn(acc, entry) {
     case entry {
       #("entry", _, elements) -> {
         parse_atom_entry(elements)
@@ -200,6 +240,29 @@ fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
   })
   |> list.reverse
   |> Ok
+}
+
+fn parse_rss_entry(etc) -> Result(Entry, Nil) {
+  let values =
+    list.fold(etc, dict.new(), fn(entry, element) {
+      case element {
+        #("title", _, [title]) ->
+          dict.insert(entry, "title", charlist.to_string(title))
+        #("pubDate", _, [published]) -> {
+          dict.insert(entry, "published", charlist.to_string(published))
+        }
+        #("link", _, [link]) -> {
+          dict.insert(entry, "url", charlist.to_string(link))
+        }
+        #(_, _, _) -> entry
+      }
+    })
+
+  use title <- result.try(dict.get(values, "title"))
+  use url <- result.try(dict.get(values, "url"))
+  use published <- result.try(dict.get(values, "published"))
+  use datetime <- result.try(birl.from_http(published))
+  Ok(Entry(title, url, datetime, 0))
 }
 
 fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
@@ -230,4 +293,4 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
 }
 
 @external(erlang, "erlsom", "simple_form")
-fn parse_xml(doc: String, options: List(a)) -> #(result, element, String)
+fn parse_xml(doc: String, options: List(a)) -> #(result, item, String)
