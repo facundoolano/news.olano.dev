@@ -133,22 +133,19 @@ fn handle_message(message: Message, state: State) {
     PollFeed(self) -> {
       io.println("polling server")
 
-      // TODO refactor?
-      let state = case fetch(state.name, state.url, cache_to: cache_dir) {
-        Ok(body) -> {
-          case parse_feed(body) {
-            Ok(entries) -> State(..state, entries: entries)
-            Error(msg) -> {
-              io.println("request error " <> string.inspect(msg))
-              state
-            }
-          }
-        }
+      let maybe_entries =
+        fetch(state.name, state.url, cache_to: cache_dir)
+        |> result.replace_error(Nil)
+        |> result.try(parse_feed)
+
+      case maybe_entries {
+        Ok(entries) -> State(..state, entries: entries)
         Error(msg) -> {
           io.println("request error " <> string.inspect(msg))
           state
         }
       }
+
       process.send_after(self, poll_interval_ms, PollFeed(self))
       actor.continue(state)
     }
