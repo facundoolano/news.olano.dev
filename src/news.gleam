@@ -1,16 +1,22 @@
 import feed
 import gleam/io
 import gleam/list
+import gleam/result
+import gleam/string
+import simplifile
 
 pub fn main() {
-  io.println("Hello from news!")
-
-  [
-    feed.start("olano.dev", "https://olano.dev/feed.xml"),
-    feed.start("jorge", "https://jorge.olano.dev/feed.xml"),
-    feed.start("hackernews", "https://hnrss.org/best"),
-  ]
+  use contents <- result.try(simplifile.read("feeds.csv"))
+  contents
+  |> string.split("\n")
+  |> list.fold([], fn(acc, line) {
+    case string.split(line, ",") {
+      [name, url] -> [feed.start(name, url), ..acc]
+      _ -> acc
+    }
+  })
   |> loop
+  Ok(Nil)
 }
 
 fn loop(feeds) {
