@@ -271,7 +271,7 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
   use title <- result.try(dict.get(values, "title"))
   use url <- result.try(dict.get(values, "url"))
   use published <- result.try(dict.get(values, "published"))
-  use datetime <- result.try(birl.parse(published))
+  use datetime <- result.try(birl.from_naive(published))
   Ok(Entry(title, url, datetime, 0))
 }
 
