@@ -179,7 +179,7 @@ fn parse_feed(body: String) -> Result(List(Entry), Nil) {
   // helpers because if I try to reuse the structure the type checker complaints
   // about the differing structures of the two formats
   // hacky but beats figuring out the gleam decoder stuff
-  let #(tag, _, _) = parse_xml_root(body)
+  let #(tag, _) = parse_xml_root(body)
 
   case tag {
     "feed" -> parse_atom_feed(body)
@@ -192,7 +192,7 @@ fn parse_feed(body: String) -> Result(List(Entry), Nil) {
 }
 
 fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_, _, elements) = parse_xml_root(body)
+  let #(_, elements) = parse_xml_root(body)
 
   let assert [#(_, _, elements), ..] = elements
   list.fold(elements, [], fn(acc, entry) {
@@ -210,7 +210,7 @@ fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
 }
 
 fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_, _, root) = parse_xml_root(body)
+  let #(_, root) = parse_xml_root(body)
   list.fold(root, [], fn(acc, entry) {
     case entry {
       #("entry", _, elements) -> {
@@ -275,14 +275,16 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
   Ok(Entry(title, url, datetime, 0))
 }
 
-fn parse_xml_root(body: String) -> #(String, root1, root2) {
+// TODO rescue to prevent errors
+fn parse_xml_root(body: String) -> #(String, root2) {
   let #(_ok, root, _tail) =
     parse_xml(body, [
       #(atom.create_from_string("nameFun"), fn(name, _, _) {
         charlist.to_string(name)
       }),
     ])
-  root
+  let #(tag, _, elements) = root
+  #(tag, elements)
 }
 
 @external(erlang, "erlsom", "simple_form")
