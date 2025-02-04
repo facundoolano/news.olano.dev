@@ -1,6 +1,7 @@
 import birl
 import birl/duration
 import gleam/dict
+import gleam/erlang
 import gleam/erlang/atom
 import gleam/erlang/charlist
 import gleam/erlang/process.{type Subject}
@@ -140,7 +141,9 @@ fn handle_message(message: Message, state: State) {
       case maybe_entries {
         Ok(entries) -> State(..state, entries: entries)
         Error(msg) -> {
-          io.println("request error " <> string.inspect(msg))
+          io.println(
+            "request error querying " <> state.url <> " " <> string.inspect(msg),
+          )
           state
         }
       }
@@ -179,20 +182,22 @@ fn parse_feed(body: String) -> Result(List(Entry), Nil) {
   // helpers because if I try to reuse the structure the type checker complaints
   // about the differing structures of the two formats
   // hacky but beats figuring out the gleam decoder stuff
-  let #(tag, _) = parse_xml_root(body)
-
-  case tag {
-    "feed" -> parse_atom_feed(body)
-    "rss" -> parse_rss_feed(body)
-    _ -> {
-      io.println("unknown feed type " <> tag)
+  case parse_xml_root(body) {
+    Ok(#("feed", _)) -> parse_atom_feed(body)
+    Ok(#("rss", _)) -> parse_rss_feed(body)
+    Ok(#(other, _)) -> {
+      io.println("unknown feed type " <> other)
+      Error(Nil)
+    }
+    err -> {
+      let _ = io.debug(err)
       Error(Nil)
     }
   }
 }
 
 fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_, elements) = parse_xml_root(body)
+  use #(_, elements) <- result.try(parse_xml_root(body))
 
   let assert [#(_, _, elements), ..] = elements
   list.fold(elements, [], fn(acc, entry) {
@@ -210,7 +215,8 @@ fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
 }
 
 fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
-  let #(_, root) = parse_xml_root(body)
+  use #(_, root) <- result.try(parse_xml_root(body))
+
   list.fold(root, [], fn(acc, entry) {
     case entry {
       #("entry", _, elements) -> {
@@ -276,15 +282,23 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
 }
 
 // TODO rescue to prevent errors
-fn parse_xml_root(body: String) -> #(String, root2) {
-  let #(_ok, root, _tail) =
-    parse_xml(body, [
-      #(atom.create_from_string("nameFun"), fn(name, _, _) {
-        charlist.to_string(name)
-      }),
-    ])
-  let #(tag, _, elements) = root
-  #(tag, elements)
+fn parse_xml_root(body: String) -> Result(#(String, root2), Nil) {
+  let parsed_safe =
+    erlang.rescue(fn() {
+      parse_xml(body, [
+        #(atom.create_from_string("nameFun"), fn(name, _, _) {
+          charlist.to_string(name)
+        }),
+      ])
+    })
+
+  case parsed_safe {
+    Ok(#(_ok, root, _tail)) -> {
+      let #(tag, _, elements) = root
+      Ok(#(tag, elements))
+    }
+    _ -> Error(Nil)
+  }
 }
 
 @external(erlang, "erlsom", "simple_form")
