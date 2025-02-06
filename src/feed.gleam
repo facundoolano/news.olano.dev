@@ -41,7 +41,7 @@ pub fn start(name: String, url: String) -> Subject(Message) {
     actor.start_spec(actor.Spec(
       init: fn() { init(name, url) },
       loop: handle_message,
-      init_timeout: 2000,
+      init_timeout: 10_000,
     ))
   source
 }
@@ -105,14 +105,14 @@ fn calc_bucket(entries: List(Entry)) -> Int {
 }
 
 fn init(name: String, url: String) {
-  // if there's a previously cached file, parse it now and request alter
-  // otherwise schedule to request now (after initialization)
+  // if there's a previously cached file, parse it now and request later
+  // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir <> name)
     |> result.replace_error(Nil)
     |> result.try(parse_feed)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
-    |> result.unwrap(or: #([], 0))
+    |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
 
   let state = State(name, url, entries)
   let subject = process.new_subject()
@@ -155,6 +155,8 @@ fn handle_message(message: Message, state: State) {
 }
 
 /// TODO explain
+// TODO add recursive follow redirects (with a limit)
+
 fn fetch(
   name: String,
   url: String,

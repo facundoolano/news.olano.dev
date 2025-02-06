@@ -1,4 +1,5 @@
 import feed
+import gleam/erlang/process
 import gleam/io
 import gleam/list
 import gleam/result
@@ -23,6 +24,6 @@ fn loop(feeds) {
   list.flat_map(feeds, feed.entries)
   |> list.sort(by: feed.entry_compare)
   |> list.map(fn(e) { io.println(feed.entry_format(e)) })
-  // process.sleep(1000)
+  process.sleep(10_000)
   // loop(feeds)
 }
