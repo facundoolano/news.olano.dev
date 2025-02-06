@@ -155,8 +155,6 @@ fn handle_message(message: Message, state: State) {
 }
 
 /// TODO explain
-// TODO add recursive follow redirects (with a limit)
-
 fn fetch(
   name: String,
   url: String,
@@ -165,18 +163,26 @@ fn fetch(
   let path = cache_dir <> name
 
   use _ <- result.try_recover(simplifile.read(path))
-  use req <- result.try(result.replace_error(request.to(url), "request error"))
-  // TODO accept xml
+  let assert Ok(req) = request.to(url)
+  let req = request.prepend_header(req, "accept", "application/xml")
+
   // TODO fail if error status
   use resp <- result.try(result.replace_error(httpc.send(req), "request error"))
 
-  // cache contents for next time
-  let _ =
-    result.try(simplifile.create_directory_all(cache_dir), fn(_) {
-      simplifile.write(path, resp.body)
-    })
+  case resp.status {
+    status if status >= 400 -> {
+      Error("response error " <> int.to_string(status))
+    }
+    _ -> {
+      // cache contents for next time
+      let _ =
+        result.try(simplifile.create_directory_all(cache_dir), fn(_) {
+          simplifile.write(path, resp.body)
+        })
 
-  Ok(resp.body)
+      Ok(resp.body)
+    }
+  }
 }
 
 fn parse_feed(body: String) -> Result(List(Entry), Nil) {
