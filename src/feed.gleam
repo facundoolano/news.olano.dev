@@ -202,8 +202,13 @@ fn fetch(
     _ -> req
   }
 
-  // TODO fail if error status
-  use resp <- result.try(result.replace_error(httpc.send(req), "request error"))
+  let maybe_resp =
+    httpc.configure()
+    |> httpc.follow_redirects(True)
+    |> httpc.dispatch(req)
+    |> result.replace_error("request error")
+
+  use resp <- result.try(maybe_resp)
 
   case resp.status {
     status if status >= 400 -> {
