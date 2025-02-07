@@ -15,6 +15,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
 import gleam/result
+import gleam/string
 import simplifile
 
 const poll_interval_ms = 3_600_000
@@ -139,7 +140,6 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      io.println("polling " <> state.name)
       let maybe_response =
         fetch(
           state.name,
@@ -153,20 +153,27 @@ fn handle_message(message: Message, state: State) {
       let state = case maybe_response {
         Ok(#(body, etag, last_modified)) ->
           case parse_feed(body) {
-            Ok(entries) ->
+            Ok(entries) -> {
+              io.println("OK " <> state.url)
               State(
                 ..state,
                 entries: entries,
                 etag: etag,
                 last_modified: last_modified,
               )
-            _ -> {
-              io.println("parsing error querying " <> state.url)
+            }
+            Error(error) -> {
+              io.println(
+                "ERROR parsing " <> state.url <> " " <> string.inspect(error),
+              )
+
               state
             }
           }
-        _ -> {
-          io.println("request error querying " <> state.url)
+        Error(error) -> {
+          io.println(
+            "ERROR fetching " <> state.url <> " " <> string.inspect(error),
+          )
           state
         }
       }
@@ -206,7 +213,7 @@ fn fetch(
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
-    |> result.replace_error("request error")
+    |> result.map_error(fn(e) { "request error: " <> string.inspect(e) })
 
   use resp <- result.try(maybe_resp)
 
