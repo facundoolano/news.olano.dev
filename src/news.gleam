@@ -1,4 +1,4 @@
-import feed
+import feed.{type Entry}
 import gleam/erlang/process
 import gleam/io
 import gleam/list
@@ -21,9 +21,17 @@ pub fn main() {
 }
 
 fn loop(feeds) {
-  list.flat_map(feeds, feed.entries)
-  |> list.sort(by: feed.entry_compare)
+  latest_entries(feeds)
+  |> list.take(30)
   |> list.map(fn(e) { io.println(feed.entry_format(e)) })
   process.sleep(10_000)
-  // loop(feeds)
+  loop(feeds)
+}
+
+fn latest_entries(feeds) -> List(Entry) {
+  list.flat_map(feeds, feed.entries)
+  |> list.sort(by: feed.entry_compare)
+  // TODO remove older than 48hs
+  // TODO order by bucket asc + date desc
+  // TODO remove duplicates
 }

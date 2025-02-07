@@ -16,6 +16,7 @@ import gleam/order
 import gleam/otp/actor
 import gleam/result
 import gleam/string
+import gleam/uri
 import simplifile
 
 const poll_interval_ms = 3_600_000
@@ -72,11 +73,11 @@ pub fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
 
 pub fn entry_format(entry: Entry) {
   entry.title
-  <> " ("
+  <> " ["
   <> entry.url
-  <> ")\n"
+  <> "] | "
   <> birl.legible_difference(birl.now(), entry.published)
-  <> "\n"
+  // <> "\n"
 }
 
 // TODO unit test this
@@ -117,6 +118,7 @@ fn init(name: String, url: String) {
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir <> name)
+    // TODO cleanup errors
     |> result.replace_error(Nil)
     |> result.try(parse_feed)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
@@ -162,6 +164,7 @@ fn handle_message(message: Message, state: State) {
                 last_modified: last_modified,
               )
             }
+            // TODO cleanup errors
             Error(error) -> {
               io.println(
                 "ERROR parsing " <> state.url <> " " <> string.inspect(error),
@@ -170,6 +173,7 @@ fn handle_message(message: Message, state: State) {
               state
             }
           }
+        // TODO cleanup errors
         Error(error) -> {
           io.println(
             "ERROR fetching " <> state.url <> " " <> string.inspect(error),
@@ -184,6 +188,8 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
+// FIXME maybe take a feed and return a feed in addition to the body?
+// or separate in two: http only and feed manipulation
 /// TODO explain
 fn fetch(
   name: String,
@@ -213,12 +219,14 @@ fn fetch(
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
+    // TODO cleanup errors
     |> result.map_error(fn(e) { "request error: " <> string.inspect(e) })
 
   use resp <- result.try(maybe_resp)
 
   case resp.status {
     status if status >= 400 -> {
+      // TODO cleanup errors?
       Error("response error " <> int.to_string(status))
     }
     _ -> {
@@ -246,10 +254,12 @@ fn parse_feed(body: String) -> Result(List(Entry), Nil) {
     Ok(#("feed", _)) -> parse_atom_feed(body)
     Ok(#("rss", _)) -> parse_rss_feed(body)
     Ok(#(other, _)) -> {
+      // TODO cleanup errors
       io.println("unknown feed type " <> other)
       Error(Nil)
     }
     err -> {
+      // TODO cleanup errors
       let _ = io.debug(err)
       Error(Nil)
     }
@@ -310,6 +320,7 @@ fn parse_rss_entry(etc) -> Result(Entry, Nil) {
   use title <- result.try(dict.get(values, "title"))
   use url <- result.try(dict.get(values, "url"))
   use published <- result.try(dict.get(values, "published"))
+  use url <- result.try(normalize(url))
   use datetime <- result.try(birl.from_http(published))
   Ok(Entry(title, url, datetime, 0))
 }
@@ -336,9 +347,22 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
 
   use title <- result.try(dict.get(values, "title"))
   use url <- result.try(dict.get(values, "url"))
+  use url <- result.try(normalize(url))
   use published <- result.try(dict.get(values, "published"))
   use datetime <- result.try(birl.from_naive(published))
   Ok(Entry(title, url, datetime, 0))
+}
+
+fn normalize(url: String) -> Result(String, Nil) {
+  use parsed <- result.try(uri.parse(url))
+  use host <- result.try(option.to_result(parsed.host, Nil))
+  let path = case string.ends_with(parsed.path, "/") {
+    True -> string.drop_end(parsed.path, up_to: 1)
+    False -> parsed.path
+  }
+  let host = string.replace(host, "www.", "")
+  let url = "https://" <> host <> path
+  Ok(url)
 }
 
 // TODO rescue to prevent errors
