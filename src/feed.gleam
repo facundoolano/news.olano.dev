@@ -6,14 +6,15 @@ import gleam/erlang/atom
 import gleam/erlang/charlist
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
+import gleam/http/response
 import gleam/httpc
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
 import gleam/result
-import gleam/string
 import simplifile
 
 const poll_interval_ms = 3_600_000
@@ -33,7 +34,13 @@ pub type Entry {
 }
 
 type State {
-  State(name: String, url: String, entries: List(Entry))
+  State(
+    name: String,
+    url: String,
+    entries: List(Entry),
+    etag: Option(String),
+    last_modified: Option(String),
+  )
 }
 
 pub fn start(name: String, url: String) -> Subject(Message) {
@@ -114,7 +121,7 @@ fn init(name: String, url: String) {
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
 
-  let state = State(name, url, entries)
+  let state = State(name, url, entries, None, None)
   let subject = process.new_subject()
   process.send_after(subject, interval, PollFeed(subject))
 
@@ -133,17 +140,33 @@ fn handle_message(message: Message, state: State) {
     }
     PollFeed(self) -> {
       io.println("polling " <> state.name)
-      let maybe_entries =
-        fetch(state.name, state.url, cache_to: cache_dir)
-        |> result.replace_error(Nil)
-        |> result.try(parse_feed)
+      let maybe_response =
+        fetch(
+          state.name,
+          state.url,
+          state.etag,
+          state.last_modified,
+          cache_to: cache_dir,
+        )
 
-      case maybe_entries {
-        Ok(entries) -> State(..state, entries: entries)
-        Error(msg) -> {
-          io.println(
-            "request error querying " <> state.url <> " " <> string.inspect(msg),
-          )
+      // TODO refactor
+      let state = case maybe_response {
+        Ok(#(body, etag, last_modified)) ->
+          case parse_feed(body) {
+            Ok(entries) ->
+              State(
+                ..state,
+                entries: entries,
+                etag: etag,
+                last_modified: last_modified,
+              )
+            _ -> {
+              io.println("parsing error querying " <> state.url)
+              state
+            }
+          }
+        _ -> {
+          io.println("request error querying " <> state.url)
           state
         }
       }
@@ -158,13 +181,26 @@ fn handle_message(message: Message, state: State) {
 fn fetch(
   name: String,
   url: String,
+  etag: Option(String),
+  last_modified: Option(String),
   cache_to cache_dir: String,
-) -> Result(String, String) {
+) -> Result(#(String, Option(String), Option(String)), String) {
   let path = cache_dir <> name
 
-  use _ <- result.try_recover(simplifile.read(path))
+  use _ <- result.try_recover(
+    result.map(simplifile.read(path), fn(body) { #(body, None, None) }),
+  )
   let assert Ok(req) = request.to(url)
   let req = request.prepend_header(req, "accept", "application/xml")
+  let req = case etag {
+    Some(etag) -> request.prepend_header(req, "If-None-Match", etag)
+    _ -> req
+  }
+  let req = case last_modified {
+    Some(last_modified) ->
+      request.prepend_header(req, "If-Modified-Since", last_modified)
+    _ -> req
+  }
 
   // TODO fail if error status
   use resp <- result.try(result.replace_error(httpc.send(req), "request error"))
@@ -180,7 +216,11 @@ fn fetch(
           simplifile.write(path, resp.body)
         })
 
-      Ok(resp.body)
+      Ok(#(
+        resp.body,
+        option.from_result(response.get_header(resp, "ETag")),
+        option.from_result(response.get_header(resp, "Last-Modified")),
+      ))
     }
   }
 }
