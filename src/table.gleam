@@ -1,6 +1,6 @@
 import birl
 import birl/duration
-import feed.{type Entry, type Feed}
+import feed.{type Entry}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -8,6 +8,7 @@ import gleam/io
 import gleam/list
 import gleam/order
 import gleam/otp/actor
+import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
 
@@ -69,7 +70,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
 }
 
 fn bucketed_entries(feed: Feed) -> List(EntryWithBucket) {
-  let entries = feed.entries(feed)
+  let entries = poller.entries(feed)
   let bucket = calc_bucket(entries)
   list.map(entries, fn(entry) { EntryWithBucket(bucket, entry) })
 }

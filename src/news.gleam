@@ -1,4 +1,5 @@
 import birl
+import feed.{Feed}
 import gleam/bytes_tree
 import gleam/http
 import gleam/http/request.{type Request}
@@ -7,11 +8,11 @@ import gleam/int
 import gleam/io
 import mist.{type Connection, type ResponseData}
 
-import feed
 import gleam/erlang/process
 import gleam/list
 import gleam/result
 import gleam/string
+import poller
 import simplifile
 import table
 
@@ -28,7 +29,7 @@ fn setup_feeds() {
     |> string.split("\n")
     |> list.fold([], fn(acc, line) {
       case string.split(line, ",") {
-        [name, url] -> [feed.start(name, url), ..acc]
+        [name, url] -> [poller.start(Feed(name, url)), ..acc]
         _ -> acc
       }
     })
