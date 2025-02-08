@@ -23,14 +23,15 @@ const poll_interval_ms = 3_600_000
 
 const cache_dir: String = "./feedcache/"
 
+pub type Feed =
+  Subject(Message)
+
 pub type Message {
   PollFeed(Subject(Message))
   GetEntries(Subject(List(Entry)))
 }
 
-// TODO consider moving to its own mod
-// TODO the bucket is more of an attr of the the feed, although it's more convenient to
-// set it in the entry for later access / ordering, may need to revisit this
+// FIXME remove freq bucket
 pub type Entry {
   Entry(title: String, url: String, published: birl.Time, freq_bucket: Int)
 }
@@ -45,14 +46,14 @@ type State {
   )
 }
 
-pub fn start(name: String, url: String) -> Subject(Message) {
-  let assert Ok(source) =
+pub fn start(name: String, url: String) -> Feed {
+  let assert Ok(feed) =
     actor.start_spec(actor.Spec(
       init: fn() { init(name, url) },
       loop: handle_message,
       init_timeout: 10_000,
     ))
-  source
+  feed
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
@@ -126,11 +127,11 @@ fn init(name: String, url: String) {
 
   let state = State(name, url, entries, None, None)
   let subject = process.new_subject()
-  process.send_after(subject, interval, PollFeed(subject))
-
   // I don't really understand what this means
   let selector =
     process.new_selector() |> process.selecting(subject, fn(x) { x })
+
+  process.send_after(subject, interval, PollFeed(subject))
 
   actor.Ready(state, selector)
 }
