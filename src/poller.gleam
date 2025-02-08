@@ -50,8 +50,7 @@ fn init(feed: Feed) {
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir <> feed.name)
-    // TODO cleanup errors
-    |> result.replace_error(Nil)
+    |> result.map_error(string.inspect)
     |> result.try(parser.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
@@ -133,10 +132,7 @@ fn fetch(state: State) -> Result(#(State, String), String) {
   use resp <- result.try(maybe_resp)
 
   case resp.status {
-    status if status >= 400 -> {
-      // TODO cleanup errors?
-      Error("response error " <> int.to_string(status))
-    }
+    status if status >= 400 -> Error("response error " <> int.to_string(status))
     _ -> {
       // cache contents for next time
       let path = cache_dir <> state.feed.name

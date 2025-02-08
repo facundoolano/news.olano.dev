@@ -4,31 +4,24 @@ import gleam/dict
 import gleam/erlang
 import gleam/erlang/atom
 import gleam/erlang/charlist
-import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
 import gleam/uri
 
-pub fn parse(body: String) -> Result(List(Entry), Nil) {
+pub fn parse(body: String) -> Result(List(Entry), String) {
   // parsing here just to check the tag, then parsing again in the internal atom/rss
   // helpers because if I try to reuse the structure the type checker complaints
   // about the differing structures of the two formats
   // hacky but beats figuring out the gleam decoder stuff
   case parse_xml_root(body) {
-    Ok(#("feed", _)) -> parse_atom_feed(body)
-    Ok(#("rss", _)) -> parse_rss_feed(body)
-    Ok(#(other, _)) -> {
-      // TODO cleanup errors
-      io.println("unknown feed type " <> other)
-      Error(Nil)
-    }
-    err -> {
-      // TODO cleanup errors
-      let _ = io.debug(err)
-      Error(Nil)
-    }
+    Ok(#("feed", _)) ->
+      parse_atom_feed(body) |> result.replace_error("atom feed parse error")
+    Ok(#("rss", _)) ->
+      parse_rss_feed(body) |> result.replace_error("rss feed parse error")
+    Ok(#(other, _)) -> Error("unknown feed type " <> other)
+    Error(err) -> Error("unknown feed type " <> string.inspect(err))
   }
 }
 
