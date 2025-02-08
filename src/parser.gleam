@@ -83,12 +83,13 @@ fn parse_rss_entry(etc) -> Result(Entry, Nil) {
       }
     })
 
-  use title <- result.try(dict.get(values, "title"))
-  use url <- result.try(dict.get(values, "url"))
-  use published <- result.try(dict.get(values, "published"))
-  use url <- result.try(normalize(url))
-  use datetime <- result.try(birl.from_http(published))
-  Ok(Entry(title, url, datetime))
+  let title = dict.get(values, "title")
+  let url = dict.get(values, "url") |> result.try(normalize)
+  let published = dict.get(values, "published") |> result.try(birl.from_http)
+  case title, url, published {
+    Ok(title), Ok(url), Ok(published) -> Ok(Entry(title, url, published))
+    _, _, _ -> Error(Nil)
+  }
 }
 
 fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
@@ -111,12 +112,13 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
       }
     })
 
-  use title <- result.try(dict.get(values, "title"))
-  use url <- result.try(dict.get(values, "url"))
-  use url <- result.try(normalize(url))
-  use published <- result.try(dict.get(values, "published"))
-  use datetime <- result.try(birl.from_naive(published))
-  Ok(Entry(title, url, datetime))
+  let title = dict.get(values, "title")
+  let url = dict.get(values, "url") |> result.try(normalize)
+  let published = dict.get(values, "published") |> result.try(birl.from_naive)
+  case title, url, published {
+    Ok(title), Ok(url), Ok(published) -> Ok(Entry(title, url, published))
+    _, _, _ -> Error(Nil)
+  }
 }
 
 fn normalize(url: String) -> Result(String, Nil) {
