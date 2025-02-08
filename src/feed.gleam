@@ -1,5 +1,4 @@
 import birl
-import birl/duration
 import gleam/dict
 import gleam/erlang
 import gleam/erlang/atom
@@ -12,7 +11,6 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/order
 import gleam/otp/actor
 import gleam/result
 import gleam/string
@@ -31,9 +29,8 @@ pub type Message {
   GetEntries(Subject(List(Entry)))
 }
 
-// FIXME remove freq bucket
 pub type Entry {
-  Entry(title: String, url: String, published: birl.Time, freq_bucket: Int)
+  Entry(title: String, url: String, published: birl.Time)
 }
 
 type State {
@@ -57,19 +54,7 @@ pub fn start(name: String, url: String) -> Feed {
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
-  let entries = actor.call(feed, GetEntries(_), 10_000)
-  let bucket = calc_bucket(entries)
-  list.map(entries, fn(e) { Entry(..e, freq_bucket: bucket) })
-}
-
-/// Compare entries by frequency bucket and published date
-/// (less frequent and newest come first)
-pub fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
-  case int.compare(e1.freq_bucket, e2.freq_bucket) {
-    order.Eq -> birl.compare(e2.published, e1.published)
-    // swap to get newer first
-    result -> result
-  }
+  actor.call(feed, GetEntries(_), 10_000)
 }
 
 pub fn entry_format(entry: Entry) {
@@ -79,39 +64,6 @@ pub fn entry_format(entry: Entry) {
   <> "] | "
   <> birl.legible_difference(birl.now(), entry.published)
   // <> "\n"
-}
-
-// TODO unit test this
-fn calc_bucket(entries: List(Entry)) -> Int {
-  let by_date =
-    list.sort(entries, by: fn(e1, e2) {
-      birl.compare(e1.published, e2.published)
-    })
-
-  case list.first(by_date), list.last(by_date) {
-    Ok(first), Ok(last) -> {
-      let delta = birl.difference(last.published, first.published)
-      let days = int.max(1, duration.blur_to(delta, duration.Day))
-      let posts_per_day =
-        int.to_float(list.length(entries)) /. int.to_float(days)
-
-      case posts_per_day {
-        // once a month or less
-        n if n <=. 1.0 /. 30.0 -> 0
-        // once week or less
-        n if n <=. 1.0 /. 7.0 -> 1
-        // once a day or less
-        n if n <=. 1.0 /. 1.0 -> 2
-        // 5 times a day or less
-        n if n <=. 1.0 /. 5.0 -> 3
-        // 20 times a day or less
-        n if n <=. 1.0 /. 20.0 -> 4
-        // more
-        _ -> 5
-      }
-    }
-    _, _ -> 0
-  }
 }
 
 fn init(name: String, url: String) {
@@ -323,7 +275,7 @@ fn parse_rss_entry(etc) -> Result(Entry, Nil) {
   use published <- result.try(dict.get(values, "published"))
   use url <- result.try(normalize(url))
   use datetime <- result.try(birl.from_http(published))
-  Ok(Entry(title, url, datetime, 0))
+  Ok(Entry(title, url, datetime))
 }
 
 fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
@@ -351,7 +303,7 @@ fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
   use url <- result.try(normalize(url))
   use published <- result.try(dict.get(values, "published"))
   use datetime <- result.try(birl.from_naive(published))
-  Ok(Entry(title, url, datetime, 0))
+  Ok(Entry(title, url, datetime))
 }
 
 fn normalize(url: String) -> Result(String, Nil) {

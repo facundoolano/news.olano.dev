@@ -3,7 +3,9 @@ import birl/duration
 import feed.{type Entry, type Feed}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/int
 import gleam/list
+import gleam/order
 import gleam/otp/actor
 
 const table_key = "entry_table"
@@ -44,19 +46,73 @@ fn handle_message(message: Message, state: State) {
   actor.continue(state)
 }
 
+// type EntryWithBucket {
+//   EntryWithBucket(bucket: Int, entry: Entry)
+// }
+
 fn latest_entries(feeds: List(Feed)) -> List(Entry) {
-  list.flat_map(feeds, feed.entries)
+  list.flat_map(feeds, bucketed_entries)
   // index by url to remove duplicates
   // and keep only the last 48hs of entries
   |> list.fold_right(dict.new(), fn(acc, e) {
-    let delta = birl.difference(birl.now(), e.published)
+    let delta = birl.difference(birl.now(), { e.1 }.published)
     case duration.blur_to(delta, duration.Day) <= entries_cutoff_days {
-      True -> dict.insert(acc, e.url, e)
+      True -> dict.insert(acc, { e.1 }.url, e)
       False -> acc
     }
   })
   |> dict.values
-  |> list.sort(by: feed.entry_compare)
+  |> list.sort(by: entry_compare)
+  |> list.map(fn(e) { e.1 })
+}
+
+fn bucketed_entries(feed: Feed) -> List(#(Int, Entry)) {
+  let entries = feed.entries(feed)
+  let bucket = calc_bucket(entries)
+  list.map(entries, fn(e) { #(bucket, e) })
+}
+
+/// Compare entries by frequency bucket and published date
+/// (less frequent and newest come first)
+pub fn entry_compare(e1: #(Int, Entry), e2: #(Int, Entry)) -> order.Order {
+  case int.compare(e1.0, e2.0) {
+    order.Eq -> birl.compare({ e2.1 }.published, { e1.1 }.published)
+    // swap to get newer first
+    result -> result
+  }
+}
+
+// TODO unit test this
+fn calc_bucket(entries: List(Entry)) -> Int {
+  let by_date =
+    list.sort(entries, by: fn(e1, e2) {
+      birl.compare(e1.published, e2.published)
+    })
+
+  case list.first(by_date), list.last(by_date) {
+    Ok(first), Ok(last) -> {
+      let delta = birl.difference(last.published, first.published)
+      let days = int.max(1, duration.blur_to(delta, duration.Day))
+      let posts_per_day =
+        int.to_float(list.length(entries)) /. int.to_float(days)
+
+      case posts_per_day {
+        // once a month or less
+        n if n <=. 1.0 /. 30.0 -> 0
+        // once week or less
+        n if n <=. 1.0 /. 7.0 -> 1
+        // once a day or less
+        n if n <=. 1.0 /. 1.0 -> 2
+        // 5 times a day or less
+        n if n <=. 1.0 /. 5.0 -> 3
+        // 20 times a day or less
+        n if n <=. 1.0 /. 20.0 -> 4
+        // more
+        _ -> 5
+      }
+    }
+    _, _ -> 0
+  }
 }
 
 @external(erlang, "persistent_term", "put")
