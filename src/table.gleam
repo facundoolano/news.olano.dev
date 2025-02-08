@@ -1,10 +1,16 @@
+import birl
+import birl/duration
 import feed.{type Entry, type Feed}
+import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/list
 import gleam/otp/actor
 
 const table_key = "entry_table"
 
 const rebuild_interval = 600_000
+
+const entries_cutoff_days = 4
 
 pub type Message {
   Rebuild(Subject(Message))
@@ -39,11 +45,22 @@ fn handle_message(message: Message, state: State) {
 }
 
 fn latest_entries(feeds: List(Feed)) -> List(Entry) {
-  todo
+  list.flat_map(feeds, feed.entries)
+  // index by url to remove duplicates
+  // and keep only the last 48hs of entries
+  |> list.fold_right(dict.new(), fn(acc, e) {
+    let delta = birl.difference(birl.now(), e.published)
+    case duration.blur_to(delta, duration.Day) <= entries_cutoff_days {
+      True -> dict.insert(acc, e.url, e)
+      False -> acc
+    }
+  })
+  |> dict.values
+  |> list.sort(by: feed.entry_compare)
 }
 
 @external(erlang, "persistent_term", "put")
 fn table_put(key: String, value: List(Entry)) -> ok
 
-@external(erlang, "persistent_term", "put")
+@external(erlang, "persistent_term", "get")
 fn table_get(key: String) -> List(entry)
