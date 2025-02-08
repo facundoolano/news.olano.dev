@@ -1,3 +1,4 @@
+import birl
 import gleam/bytes_tree
 import gleam/http
 import gleam/http/request.{type Request}
@@ -57,27 +58,44 @@ fn run_server() {
       resp
     }
     |> mist.new
-    |> mist.port(3000)
+    |> mist.port(3210)
     |> mist.start_http
 
   process.sleep_forever()
 }
 
 fn home() -> Response(ResponseData) {
-  let body =
-    "<!DOCTYPE html>
+  let entry_items =
+    table.get()
+    |> list.map(fn(entry) {
+      let time_ago = birl.legible_difference(birl.now(), entry.published)
+
+      "<li>"
+      <> "<a href=\""
+      <> entry.url
+      <> "\" target=\"_blank\">"
+      <> entry.title
+      <> "</a> | "
+      <> time_ago
+      <> " </li>"
+    })
+    |> string.join("\n")
+
+  let body = "<!DOCTYPE html>
 <html>
     <head>
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
         <meta charset=\"utf-8\">
         <title>news.olano.dev</title>
-        <link rel=\"stylesheet\" href=\"/assets/css/main.css\">
         <link type=\"application/atom+xml\" rel=\"alternate\" href=\"/feed.xml\" title=\"{{ site.config.name }}\"/>
     </head>
     <body>
-        <div>
-<p>Hello World!</p>
-        </div>
+      <h1>news.olano.dev</h1>
+        <ol>
+" <> entry_items <> "
+        </ol>
+        <p>built with <a href=\"https://gleam.run/\">Gleam</a></p>
+        <p><a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a></p>
     </body>
 </html>"
 

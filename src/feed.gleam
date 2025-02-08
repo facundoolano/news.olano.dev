@@ -57,15 +57,6 @@ pub fn entries(feed: Subject(Message)) -> List(Entry) {
   actor.call(feed, GetEntries(_), 10_000)
 }
 
-pub fn entry_format(entry: Entry) {
-  entry.title
-  <> " ["
-  <> entry.url
-  <> "] | "
-  <> birl.legible_difference(birl.now(), entry.published)
-  // <> "\n"
-}
-
 fn init(name: String, url: String) {
   // if there's a previously cached file, parse it now and request later
   // otherwise schedule to request now (after initialization, with a random delay)
