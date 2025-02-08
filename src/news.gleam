@@ -12,6 +12,7 @@ import gleam/erlang/process
 import gleam/list
 import gleam/result
 import gleam/string
+import poller
 import simplifile
 import table
 
@@ -28,7 +29,7 @@ fn setup_feeds() {
     |> string.split("\n")
     |> list.fold([], fn(acc, line) {
       case string.split(line, ",") {
-        [name, url] -> [Feed(name, url), ..acc]
+        [name, url] -> [poller.start(Feed(name, url)), ..acc]
         _ -> acc
       }
     })

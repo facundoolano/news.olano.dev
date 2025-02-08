@@ -1,6 +1,6 @@
 import birl
 import birl/duration
-import feed.{type Entry, type Feed}
+import feed.{type Entry}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -8,7 +8,7 @@ import gleam/io
 import gleam/list
 import gleam/order
 import gleam/otp/actor
-import poller.{type Poller}
+import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
 
@@ -21,15 +21,11 @@ pub type Message {
 }
 
 type State {
-  State(pollers: List(Poller))
+  State(feeds: List(Feed))
 }
 
 pub fn start(feeds: List(Feed)) {
-  // TODO maybe better to dispatch and do this in the init?
-  // will need to revisit with supervisor too
-  let pollers = list.map(feeds, poller.start)
-  let state = State(pollers)
-
+  let state = State(feeds)
   let assert Ok(table) = actor.start(state, handle_message)
   table_put(table_key, [])
   process.send(table, Rebuild(table))
@@ -42,7 +38,7 @@ pub fn get() -> List(Entry) {
 fn handle_message(message: Message, state: State) {
   let state = case message {
     Rebuild(self) -> {
-      let entries = latest_entries(state.pollers)
+      let entries = latest_entries(state.feeds)
       table_put(table_key, entries)
       io.println("refreshed table")
 
@@ -57,7 +53,7 @@ type EntryWithBucket {
   EntryWithBucket(bucket: Int, entry: Entry)
 }
 
-fn latest_entries(feeds: List(Poller)) -> List(Entry) {
+fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
   |> list.fold_right(dict.new(), fn(acc, e) {
     // index by url to remove duplicates
@@ -73,7 +69,7 @@ fn latest_entries(feeds: List(Poller)) -> List(Entry) {
   |> list.map(fn(e) { e.entry })
 }
 
-fn bucketed_entries(feed: Poller) -> List(EntryWithBucket) {
+fn bucketed_entries(feed: Feed) -> List(EntryWithBucket) {
   let entries = poller.entries(feed)
   let bucket = calc_bucket(entries)
   list.map(entries, fn(entry) { EntryWithBucket(bucket, entry) })
