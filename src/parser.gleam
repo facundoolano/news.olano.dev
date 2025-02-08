@@ -131,7 +131,6 @@ fn normalize(url: String) -> Result(String, Nil) {
   Ok(url)
 }
 
-// TODO rescue to prevent errors
 fn parse_xml_root(body: String) -> Result(#(String, root2), Nil) {
   let parsed_safe =
     erlang.rescue(fn() {
