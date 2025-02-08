@@ -4,6 +4,7 @@ import feed.{type Entry, type Feed}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/order
 import gleam/otp/actor
@@ -38,6 +39,7 @@ fn handle_message(message: Message, state: State) {
     Rebuild(self) -> {
       let entries = latest_entries(state.feeds)
       table_put(table_key, entries)
+      io.println("refreshed table")
 
       process.send_after(self, rebuild_interval, Rebuild(self))
       state

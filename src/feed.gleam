@@ -33,16 +33,6 @@ pub type Entry {
   Entry(title: String, url: String, published: birl.Time)
 }
 
-type State {
-  State(
-    name: String,
-    url: String,
-    entries: List(Entry),
-    etag: Option(String),
-    last_modified: Option(String),
-  )
-}
-
 pub fn start(name: String, url: String) -> Feed {
   let assert Ok(feed) =
     actor.start_spec(actor.Spec(
@@ -55,6 +45,16 @@ pub fn start(name: String, url: String) -> Feed {
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
   actor.call(feed, GetEntries(_), 10_000)
+}
+
+type State {
+  State(
+    name: String,
+    url: String,
+    entries: List(Entry),
+    etag: Option(String),
+    last_modified: Option(String),
+  )
 }
 
 fn init(name: String, url: String) {
@@ -86,27 +86,12 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      let maybe_response =
-        fetch(
-          state.name,
-          state.url,
-          state.etag,
-          state.last_modified,
-          cache_to: cache_dir,
-        )
-
-      // TODO refactor
-      let state = case maybe_response {
-        Ok(#(body, etag, last_modified)) ->
+      let state = case fetch(state) {
+        Ok(#(state, body)) ->
           case parse_feed(body) {
             Ok(entries) -> {
               io.println("OK " <> state.url)
-              State(
-                ..state,
-                entries: entries,
-                etag: etag,
-                last_modified: last_modified,
-              )
+              State(..state, entries: entries)
             }
             // TODO cleanup errors
             Error(error) -> {
@@ -132,28 +117,20 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
-// FIXME maybe take a feed and return a feed in addition to the body?
-// or separate in two: http only and feed manipulation
 /// TODO explain
-fn fetch(
-  name: String,
-  url: String,
-  etag: Option(String),
-  last_modified: Option(String),
-  cache_to cache_dir: String,
-) -> Result(#(String, Option(String), Option(String)), String) {
-  let path = cache_dir <> name
+fn fetch(feed: State) -> Result(#(State, String), String) {
+  let path = cache_dir <> feed.name
 
   use _ <- result.try_recover(
-    result.map(simplifile.read(path), fn(body) { #(body, None, None) }),
+    result.map(simplifile.read(path), fn(body) { #(feed, body) }),
   )
-  let assert Ok(req) = request.to(url)
+  let assert Ok(req) = request.to(feed.url)
   let req = request.prepend_header(req, "accept", "application/xml")
-  let req = case etag {
+  let req = case feed.etag {
     Some(etag) -> request.prepend_header(req, "If-None-Match", etag)
     _ -> req
   }
-  let req = case last_modified {
+  let req = case feed.last_modified {
     Some(last_modified) ->
       request.prepend_header(req, "If-Modified-Since", last_modified)
     _ -> req
@@ -180,11 +157,10 @@ fn fetch(
           simplifile.write(path, resp.body)
         })
 
-      Ok(#(
-        resp.body,
-        option.from_result(response.get_header(resp, "ETag")),
-        option.from_result(response.get_header(resp, "Last-Modified")),
-      ))
+      let etag = option.from_result(response.get_header(resp, "ETag"))
+      let last_modified =
+        option.from_result(response.get_header(resp, "Last-Modified"))
+      Ok(#(State(..feed, etag: etag, last_modified: last_modified), resp.body))
     }
   }
 }
