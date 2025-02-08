@@ -35,19 +35,23 @@ pub fn parse(body: String) -> Result(List(Entry), Nil) {
 fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
   use #(_, elements) <- result.try(parse_xml_root(body))
 
-  let assert [#(_, _, elements), ..] = elements
-  list.fold(elements, [], fn(acc, entry) {
-    case entry {
-      #("item", _, etc) -> {
-        parse_rss_entry(etc)
-        |> result.map(fn(entry) { [entry, ..acc] })
-        |> result.unwrap(acc)
-      }
-      _ -> acc
+  case elements {
+    [#(_, _, elements), ..] -> {
+      list.fold(elements, [], fn(acc, entry) {
+        case entry {
+          #("item", _, etc) -> {
+            parse_rss_entry(etc)
+            |> result.map(fn(entry) { [entry, ..acc] })
+            |> result.unwrap(acc)
+          }
+          _ -> acc
+        }
+      })
+      |> list.reverse
+      |> Ok
     }
-  })
-  |> list.reverse
-  |> Ok
+    _ -> Error(Nil)
+  }
 }
 
 fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
