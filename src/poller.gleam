@@ -73,36 +73,26 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      let state = case fetch(state) {
-        Ok(#(state, body)) ->
+      let new_state = case fetch(state) {
+        Ok(#(new_state, body)) ->
           case parser.parse(body) {
             Ok(entries) -> {
               io.println("OK " <> state.feed.url)
-              State(..state, entries: entries)
+              State(..new_state, entries: entries)
             }
-            // TODO cleanup errors
             Error(error) -> {
-              io.println(
-                "ERROR parsing "
-                <> state.feed.url
-                <> " "
-                <> string.inspect(error),
-              )
-
+              io.println("ERROR parsing " <> state.feed.url <> " " <> error)
               state
             }
           }
-        // TODO cleanup errors
         Error(error) -> {
-          io.println(
-            "ERROR fetching " <> state.feed.url <> " " <> string.inspect(error),
-          )
+          io.println("ERROR fetching " <> state.feed.url <> " " <> error)
           state
         }
       }
 
       process.send_after(self, poll_interval_ms, PollFeed(self))
-      actor.continue(state)
+      actor.continue(new_state)
     }
   }
 }
@@ -126,8 +116,7 @@ fn fetch(state: State) -> Result(#(State, String), String) {
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
-    // TODO cleanup errors
-    |> result.map_error(fn(e) { "request error: " <> string.inspect(e) })
+    |> result.map_error(string.inspect)
 
   use resp <- result.try(maybe_resp)
 
