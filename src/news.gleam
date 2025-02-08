@@ -1,6 +1,9 @@
 import gleam/bytes_tree
+import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
+import gleam/int
+import gleam/io
 import mist.{type Connection, type ResponseData}
 
 import feed
@@ -38,11 +41,20 @@ fn run_server() {
 
   let assert Ok(_) =
     fn(req: Request(Connection)) -> Response(ResponseData) {
-      case request.path_segments(req) {
+      io.print(
+        req.method |> http.method_to_string |> string.uppercase
+        <> " "
+        <> req.path,
+      )
+
+      let resp = case request.path_segments(req) {
         // for now a single page
-        [] -> home(req)
+        [] -> home()
         _ -> not_found
       }
+
+      io.println(" -> " <> int.to_string(resp.status))
+      resp
     }
     |> mist.new
     |> mist.port(3000)
@@ -51,7 +63,25 @@ fn run_server() {
   process.sleep_forever()
 }
 
-fn home(_request: Request(Connection)) -> Response(ResponseData) {
+fn home() -> Response(ResponseData) {
+  let body =
+    "<!DOCTYPE html>
+<html>
+    <head>
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+        <meta charset=\"utf-8\">
+        <title>news.olano.dev</title>
+        <link rel=\"stylesheet\" href=\"/assets/css/main.css\">
+        <link type=\"application/atom+xml\" rel=\"alternate\" href=\"/feed.xml\" title=\"{{ site.config.name }}\"/>
+    </head>
+    <body>
+        <div>
+<p>Hello World!</p>
+        </div>
+    </body>
+</html>"
+
   response.new(200)
-  |> response.set_body(mist.Bytes(bytes_tree.from_string("Hello World!")))
+  |> response.set_header("Content-Type", "text/html")
+  |> response.set_body(mist.Bytes(bytes_tree.from_string(body)))
 }
