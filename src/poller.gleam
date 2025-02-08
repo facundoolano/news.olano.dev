@@ -24,14 +24,12 @@ pub type Message {
   GetEntries(Subject(List(Entry)))
 }
 
-pub fn start(feed: Feed) -> Poller {
-  let assert Ok(feed) =
-    actor.start_spec(actor.Spec(
-      init: fn() { init(feed) },
-      loop: handle_message,
-      init_timeout: 10_000,
-    ))
-  feed
+pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
+  actor.start_spec(actor.Spec(
+    init: fn() { init(feed) },
+    loop: handle_message,
+    init_timeout: 10_000,
+  ))
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {

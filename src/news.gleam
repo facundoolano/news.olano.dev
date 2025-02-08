@@ -30,7 +30,11 @@ fn setup_feeds() {
     |> list.fold([], fn(acc, line) {
       case string.split(line, ",") {
         // NOTE this should likely be done by a supervisor?
-        [name, url] -> [poller.start(Feed(name, url)), ..acc]
+        [name, url] ->
+          case poller.start(Feed(name, url)) {
+            Ok(poller) -> [poller, ..acc]
+            _ -> acc
+          }
         _ -> acc
       }
     })
