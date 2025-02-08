@@ -46,37 +46,36 @@ fn handle_message(message: Message, state: State) {
   actor.continue(state)
 }
 
-// type EntryWithBucket {
-//   EntryWithBucket(bucket: Int, entry: Entry)
-// }
+type EntryWithBucket {
+  EntryWithBucket(bucket: Int, entry: Entry)
+}
 
 fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
-  // index by url to remove duplicates
-  // and keep only the last 48hs of entries
   |> list.fold_right(dict.new(), fn(acc, e) {
-    let delta = birl.difference(birl.now(), { e.1 }.published)
+    // index by url to remove duplicates
+    // and keep only the last N days of entries
+    let delta = birl.difference(birl.now(), { e.entry }.published)
     case duration.blur_to(delta, duration.Day) <= entries_cutoff_days {
-      True -> dict.insert(acc, { e.1 }.url, e)
+      True -> dict.insert(acc, { e.entry }.url, e)
       False -> acc
     }
   })
   |> dict.values
   |> list.sort(by: entry_compare)
-  |> list.map(fn(e) { e.1 })
+  |> list.map(fn(e) { e.entry })
 }
 
-fn bucketed_entries(feed: Feed) -> List(#(Int, Entry)) {
+fn bucketed_entries(feed: Feed) -> List(EntryWithBucket) {
   let entries = feed.entries(feed)
   let bucket = calc_bucket(entries)
-  list.map(entries, fn(e) { #(bucket, e) })
+  list.map(entries, fn(entry) { EntryWithBucket(bucket, entry) })
 }
 
-/// Compare entries by frequency bucket and published date
-/// (less frequent and newest come first)
-pub fn entry_compare(e1: #(Int, Entry), e2: #(Int, Entry)) -> order.Order {
-  case int.compare(e1.0, e2.0) {
-    order.Eq -> birl.compare({ e2.1 }.published, { e1.1 }.published)
+/// Compare entries by frequency bucket and published date (less frequent and newest come first)
+fn entry_compare(e1: EntryWithBucket, e2: EntryWithBucket) -> order.Order {
+  case int.compare(e1.bucket, e2.bucket) {
+    order.Eq -> birl.compare({ e2.entry }.published, { e1.entry }.published)
     // swap to get newer first
     result -> result
   }
