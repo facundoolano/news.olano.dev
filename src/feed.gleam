@@ -117,13 +117,9 @@ fn handle_message(message: Message, state: State) {
   }
 }
 
-/// TODO explain
+/// Request the source feed url, honoring the etag/last-modified config from the server,
+/// and saving the response to a local file cache for using on restarts
 fn fetch(feed: State) -> Result(#(State, String), String) {
-  let path = cache_dir <> feed.name
-
-  use _ <- result.try_recover(
-    result.map(simplifile.read(path), fn(body) { #(feed, body) }),
-  )
   let assert Ok(req) = request.to(feed.url)
   let req = request.prepend_header(req, "accept", "application/xml")
   let req = case feed.etag {
@@ -152,6 +148,7 @@ fn fetch(feed: State) -> Result(#(State, String), String) {
     }
     _ -> {
       // cache contents for next time
+      let path = cache_dir <> feed.name
       let _ =
         result.try(simplifile.create_directory_all(cache_dir), fn(_) {
           simplifile.write(path, resp.body)
