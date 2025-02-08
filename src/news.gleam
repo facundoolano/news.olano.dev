@@ -1,4 +1,7 @@
+import birl
+import birl/duration
 import feed.{type Entry}
+import gleam/dict
 import gleam/erlang/process
 import gleam/io
 import gleam/list
@@ -22,7 +25,6 @@ pub fn main() {
 
 fn loop(feeds) {
   latest_entries(feeds)
-  |> list.take(30)
   |> list.map(fn(e) { io.println(feed.entry_format(e)) })
   process.sleep(10_000)
   loop(feeds)
@@ -30,8 +32,15 @@ fn loop(feeds) {
 
 fn latest_entries(feeds) -> List(Entry) {
   list.flat_map(feeds, feed.entries)
+  // index by url to remove duplicates
+  // and keep only the last 48hs of entries
+  |> list.fold_right(dict.new(), fn(acc, e) {
+    let delta = birl.difference(birl.now(), e.published)
+    case duration.blur_to(delta, duration.Hour) < 72 {
+      True -> dict.insert(acc, e.url, e)
+      False -> acc
+    }
+  })
+  |> dict.values
   |> list.sort(by: feed.entry_compare)
-  // TODO remove older than 48hs
-  // TODO order by bucket asc + date desc
-  // TODO remove duplicates
 }
