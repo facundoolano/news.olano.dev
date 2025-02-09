@@ -14,8 +14,6 @@ const table_key = "entry_table"
 
 const rebuild_interval = 600_000
 
-const entries_cutoff_days = 4
-
 pub type Message {
   Rebuild(Subject(Message))
 }
@@ -57,12 +55,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
   |> list.fold_right(dict.new(), fn(acc, e) {
     // index by url to remove duplicates
-    // and keep only the last N days of entries
-    let delta = birl.difference(birl.now(), { e.entry }.published)
-    case duration.blur_to(delta, duration.Day) <= entries_cutoff_days {
-      True -> dict.insert(acc, { e.entry }.url, e)
-      False -> acc
-    }
+    dict.insert(acc, { e.entry }.url, e)
   })
   |> dict.values
   |> list.sort(by: entry_compare)
