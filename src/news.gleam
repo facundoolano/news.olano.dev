@@ -6,6 +6,7 @@ import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
 import mist.{type Connection, type ResponseData}
+import templates/atom_feed
 import templates/home
 
 import gleam/erlang/process
@@ -56,6 +57,7 @@ fn run_server() {
       let resp = case request.path_segments(req) {
         // for now a single page
         [] -> home()
+        ["feed"] -> atom_feed()
         _ -> not_found
       }
 
@@ -78,5 +80,18 @@ fn home() -> Response(ResponseData) {
 
   response.new(200)
   |> response.set_header("Content-Type", "text/html")
+  |> response.set_body(body)
+}
+
+fn atom_feed() -> Response(ResponseData) {
+  let body =
+    table.get()
+    |> list.take(30)
+    |> atom_feed.render_tree()
+    |> bytes_tree.from_string_tree()
+    |> mist.Bytes
+
+  response.new(200)
+  |> response.set_header("Content-Type", "text/xml")
   |> response.set_body(body)
 }

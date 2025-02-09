@@ -16,7 +16,7 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
     <link
       type=\"application/atom+xml\"
       rel=\"alternate\"
-      href=\"/feed.xml\"
+      href=\"/feed\"
       title=\"news.olano.dev\"
     />
   </head>
