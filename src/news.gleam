@@ -22,7 +22,6 @@ pub fn main() {
 }
 
 fn setup_feeds() {
-  // TODO should we do this in the table module?
   use contents <- result.try(simplifile.read("feeds.csv"))
   let feeds =
     contents
