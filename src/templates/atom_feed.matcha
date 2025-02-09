@@ -1,0 +1,23 @@
+{> import feed.{type Entry}
+{> import birl
+{> import gleam/string
+{> with entries as List(Entry)
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+    <generator uri="https://news.olano.dev/" version="0.0.1"></generator>
+    <link href="https://news.olano.dev/feed" rel="self" type="application/atom+xml"/>
+    <link href="https://news.olano.dev/" rel="alternate" type="text/html"/>
+    <updated>{{ birl.to_naive(birl.now()) }}Z</updated>
+    <id>https://news.olano.dev/feed</id>
+    <title type="html">news.olano.dev</title>
+    <author><name>Facundo Olano</name></author>
+    {% for entry in entries %}
+        <entry>
+            <title type="html">{{ string.replace(entry.title, "&", "&amp;") }}</title>
+            <link href="{{ entry.url }}" rel="alternate" type="text/html" title="{{ string.replace(entry.title, "&", "&amp;") }}"/>
+            <published>{{ birl.to_naive(entry.published) }}Z</published>
+            <updated>{{ birl.to_naive(entry.published) }}Z</updated>
+            <id>{{ entry.url }}</id>
+        </entry>
+    {% endfor %}
+</feed>

@@ -1,4 +1,3 @@
-import birl
 import feed.{Feed}
 import gleam/bytes_tree
 import gleam/http
@@ -6,9 +5,9 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
-import gleam/option.{Some}
-import gleam/uri
 import mist.{type Connection, type ResponseData}
+import templates/atom_feed
+import templates/home
 
 import gleam/erlang/process
 import gleam/list
@@ -58,6 +57,7 @@ fn run_server() {
       let resp = case request.path_segments(req) {
         // for now a single page
         [] -> home()
+        ["feed"] -> atom_feed()
         _ -> not_found
       }
 
@@ -72,51 +72,26 @@ fn run_server() {
 }
 
 fn home() -> Response(ResponseData) {
-  let entry_items =
+  let body =
     table.get()
-    // |> list.take(30)
-    // TODO paginate
-    |> list.map(format_html_entry)
-    |> string.join("\n")
-
-  let body = "<!DOCTYPE html>
-<html>
-    <head>
-        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-        <meta charset=\"utf-8\">
-        <title>news.olano.dev</title>
-        <link type=\"application/atom+xml\" rel=\"alternate\" href=\"/feed.xml\" title=\"{{ site.config.name }}\"/>
-    </head>
-    <body>
-      <h1>news.olano.dev</h1>
-        <ol>
-" <> entry_items <> "
-        </ol>
-        <p>built with <a href=\"https://gleam.run/\">Gleam</a></p>
-        <p><a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a></p>
-    </body>
-</html>"
+    |> home.render_tree()
+    |> bytes_tree.from_string_tree()
+    |> mist.Bytes
 
   response.new(200)
   |> response.set_header("Content-Type", "text/html")
-  |> response.set_body(mist.Bytes(bytes_tree.from_string(body)))
+  |> response.set_body(body)
 }
 
-fn format_html_entry(entry: feed.Entry) -> String {
-  let time_ago = birl.legible_difference(birl.now(), entry.published)
+fn atom_feed() -> Response(ResponseData) {
+  let body =
+    table.get()
+    |> list.take(30)
+    |> atom_feed.render_tree()
+    |> bytes_tree.from_string_tree()
+    |> mist.Bytes
 
-  let assert Ok(parsed) = uri.parse(entry.url)
-  let assert Some(host) = parsed.host
-  let domain = string.replace(host, "www.", "")
-
-  "<li>"
-  <> "<a href=\""
-  <> entry.url
-  <> "\" target=\"_blank\">"
-  <> entry.title
-  <> "</a>  <small>"
-  <> domain
-  <> " "
-  <> time_ago
-  <> " </small></li>"
+  response.new(200)
+  |> response.set_header("Content-Type", "text/xml")
+  |> response.set_body(body)
 }
