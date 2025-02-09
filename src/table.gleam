@@ -14,6 +14,8 @@ const table_key = "entry_table"
 
 const rebuild_interval = 600_000
 
+const max_table_size = 1000
+
 pub type Message {
   Rebuild(Subject(Message))
 }
@@ -51,14 +53,27 @@ fn handle_message(message: Message, state: State) {
   actor.continue(state)
 }
 
+/// TODO explain
 fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
-  |> list.fold_right(dict.new(), fn(acc, e) {
-    // index by url to remove duplicates
-    dict.insert(acc, { e.entry }.url, e)
+  |> list.append(table_get(table_key))
+  |> list.fold(dict.new(), fn(acc: dict.Dict(String, Entry), e) {
+    // index by url to remove duplicates, preserving the earliest created at and the lower bucket
+    let merged = case dict.get(acc, e.entry.url) {
+      Ok(stored) -> {
+        Entry(
+          int.min(e.bucket, stored.bucket),
+          e.entry,
+          int.min(e.created_at, stored.created_at),
+        )
+      }
+      _ -> e
+    }
+    dict.insert(acc, e.entry.url, merged)
   })
   |> dict.values
   |> list.sort(by: entry_compare)
+  |> list.take(max_table_size)
 }
 
 fn bucketed_entries(feed: Feed) -> List(Entry) {
