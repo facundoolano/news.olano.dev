@@ -74,6 +74,8 @@ fn run_server() {
 fn home() -> Response(ResponseData) {
   let entry_items =
     table.get()
+    // |> list.take(30)
+    // TODO paginate
     |> list.map(format_html_entry)
     |> string.join("\n")
 

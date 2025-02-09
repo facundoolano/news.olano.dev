@@ -14,7 +14,7 @@ const table_key = "entry_table"
 
 const rebuild_interval = 100_000
 
-const max_table_size = 200
+const max_table_size = 1000
 
 pub type Message {
   Rebuild(Subject(Message))
@@ -77,7 +77,15 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
 }
 
 fn bucketed_entries(feed: Feed) -> List(Entry) {
-  let entries = poller.entries(feed)
+  let entries =
+    poller.entries(feed)
+    |> list.filter(fn(e) {
+      // exclude entries over a yer old, and do it before calculating bucket
+      // so a later bloomer (?) doesn't take all the spots
+      let delta = birl.difference(birl.now(), e.published)
+      duration.blur_to(delta, duration.Month) < 12
+    })
+
   let bucket = calc_bucket(entries)
   list.map(entries, fn(entry) { Entry(bucket, entry, birl.monotonic_now()) })
 }
