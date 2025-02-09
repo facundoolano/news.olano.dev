@@ -6,6 +6,8 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
+import gleam/option.{Some}
+import gleam/uri
 import mist.{type Connection, type ResponseData}
 
 import gleam/erlang/process
@@ -22,7 +24,6 @@ pub fn main() {
 }
 
 fn setup_feeds() {
-  // TODO should we do this in the table module?
   use contents <- result.try(simplifile.read("feeds.csv"))
   let feeds =
     contents
@@ -73,18 +74,9 @@ fn run_server() {
 fn home() -> Response(ResponseData) {
   let entry_items =
     table.get()
-    |> list.map(fn(entry) {
-      let time_ago = birl.legible_difference(birl.now(), entry.published)
-
-      "<li>"
-      <> "<a href=\""
-      <> entry.url
-      <> "\" target=\"_blank\">"
-      <> entry.title
-      <> "</a> | "
-      <> time_ago
-      <> " </li>"
-    })
+    // |> list.take(30)
+    // TODO paginate
+    |> list.map(format_html_entry)
     |> string.join("\n")
 
   let body = "<!DOCTYPE html>
@@ -108,4 +100,23 @@ fn home() -> Response(ResponseData) {
   response.new(200)
   |> response.set_header("Content-Type", "text/html")
   |> response.set_body(mist.Bytes(bytes_tree.from_string(body)))
+}
+
+fn format_html_entry(entry: feed.Entry) -> String {
+  let time_ago = birl.legible_difference(birl.now(), entry.published)
+
+  let assert Ok(parsed) = uri.parse(entry.url)
+  let assert Some(host) = parsed.host
+  let domain = string.replace(host, "www.", "")
+
+  "<li>"
+  <> "<a href=\""
+  <> entry.url
+  <> "\" target=\"_blank\">"
+  <> entry.title
+  <> "</a>  <small>"
+  <> domain
+  <> " "
+  <> time_ago
+  <> " </small></li>"
 }

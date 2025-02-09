@@ -12,7 +12,7 @@ import gleam/string
 import parser
 import simplifile
 
-const poll_interval_ms = 3_600_000
+const poll_interval_ms = 1_800_000
 
 const cache_dir: String = "./feedcache/"
 
@@ -50,8 +50,7 @@ fn init(feed: Feed) {
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir <> feed.name)
-    // TODO cleanup errors
-    |> result.replace_error(Nil)
+    |> result.map_error(string.inspect)
     |> result.try(parser.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
@@ -74,36 +73,26 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      let state = case fetch(state) {
-        Ok(#(state, body)) ->
+      let new_state = case fetch(state) {
+        Ok(#(new_state, body)) ->
           case parser.parse(body) {
             Ok(entries) -> {
               io.println("OK " <> state.feed.url)
-              State(..state, entries: entries)
+              State(..new_state, entries: entries)
             }
-            // TODO cleanup errors
             Error(error) -> {
-              io.println(
-                "ERROR parsing "
-                <> state.feed.url
-                <> " "
-                <> string.inspect(error),
-              )
-
+              io.println("ERROR parsing " <> state.feed.url <> " " <> error)
               state
             }
           }
-        // TODO cleanup errors
         Error(error) -> {
-          io.println(
-            "ERROR fetching " <> state.feed.url <> " " <> string.inspect(error),
-          )
+          io.println("ERROR fetching " <> state.feed.url <> " " <> error)
           state
         }
       }
 
       process.send_after(self, poll_interval_ms, PollFeed(self))
-      actor.continue(state)
+      actor.continue(new_state)
     }
   }
 }
@@ -127,16 +116,12 @@ fn fetch(state: State) -> Result(#(State, String), String) {
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
-    // TODO cleanup errors
-    |> result.map_error(fn(e) { "request error: " <> string.inspect(e) })
+    |> result.map_error(string.inspect)
 
   use resp <- result.try(maybe_resp)
 
   case resp.status {
-    status if status >= 400 -> {
-      // TODO cleanup errors?
-      Error("response error " <> int.to_string(status))
-    }
+    status if status >= 400 -> Error("response error " <> int.to_string(status))
     _ -> {
       // cache contents for next time
       let path = cache_dir <> state.feed.name

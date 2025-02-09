@@ -1,6 +1,6 @@
 import birl
 import birl/duration
-import feed.{type Entry}
+import feed.{type Entry as FeedEntry}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -12,9 +12,9 @@ import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
 
-const rebuild_interval = 600_000
+const rebuild_interval = 100_000
 
-const entries_cutoff_days = 4
+const max_table_size = 1000
 
 pub type Message {
   Rebuild(Subject(Message))
@@ -24,6 +24,10 @@ type State {
   State(feeds: List(Feed))
 }
 
+type Entry {
+  Entry(bucket: Int, entry: FeedEntry, created_at: Int)
+}
+
 pub fn start(feeds: List(Feed)) {
   let state = State(feeds)
   let assert Ok(table) = actor.start(state, handle_message)
@@ -31,8 +35,8 @@ pub fn start(feeds: List(Feed)) {
   process.send(table, Rebuild(table))
 }
 
-pub fn get() -> List(Entry) {
-  table_get(table_key)
+pub fn get() -> List(FeedEntry) {
+  table_get(table_key) |> list.map(fn(e) { e.entry })
 }
 
 fn handle_message(message: Message, state: State) {
@@ -49,43 +53,75 @@ fn handle_message(message: Message, state: State) {
   actor.continue(state)
 }
 
-type EntryWithBucket {
-  EntryWithBucket(bucket: Int, entry: Entry)
-}
-
+/// TODO explain
 fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
-  |> list.fold_right(dict.new(), fn(acc, e) {
-    // index by url to remove duplicates
-    // and keep only the last N days of entries
-    let delta = birl.difference(birl.now(), { e.entry }.published)
-    case duration.blur_to(delta, duration.Day) <= entries_cutoff_days {
-      True -> dict.insert(acc, { e.entry }.url, e)
-      False -> acc
+  |> list.append(table_get(table_key))
+  |> list.fold(dict.new(), fn(acc: dict.Dict(String, Entry), e) {
+    // index by url to remove duplicates, preserving the earliest created at and the lower bucket
+    let merged = case dict.get(acc, e.entry.url) {
+      Ok(stored) -> {
+        Entry(
+          int.min(e.bucket, stored.bucket),
+          e.entry,
+          int.min(e.created_at, stored.created_at),
+        )
+      }
+      _ -> e
     }
+    dict.insert(acc, e.entry.url, merged)
   })
   |> dict.values
   |> list.sort(by: entry_compare)
-  |> list.map(fn(e) { e.entry })
+  |> list.take(max_table_size)
 }
 
-fn bucketed_entries(feed: Feed) -> List(EntryWithBucket) {
-  let entries = poller.entries(feed)
+fn bucketed_entries(feed: Feed) -> List(Entry) {
+  let entries =
+    poller.entries(feed)
+    |> list.filter(fn(e) {
+      // exclude entries over a yer old, and do it before calculating bucket
+      // so a later bloomer (?) doesn't take all the spots
+      let delta = birl.difference(birl.now(), e.published)
+      duration.blur_to(delta, duration.Month) < 12
+    })
+
   let bucket = calc_bucket(entries)
-  list.map(entries, fn(entry) { EntryWithBucket(bucket, entry) })
+  list.map(entries, fn(entry) { Entry(bucket, entry, birl.monotonic_now()) })
 }
 
 /// Compare entries by frequency bucket and published date (less frequent and newest come first)
-fn entry_compare(e1: EntryWithBucket, e2: EntryWithBucket) -> order.Order {
-  case int.compare(e1.bucket, e2.bucket) {
-    order.Eq -> birl.compare({ e2.entry }.published, { e1.entry }.published)
-    // swap to get newer first
-    result -> result
+fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
+  let delta1 =
+    duration.blur_to(
+      birl.difference(birl.now(), e1.entry.published),
+      duration.Hour,
+    )
+
+  let delta2 =
+    duration.blur_to(
+      birl.difference(birl.now(), e2.entry.published),
+      duration.Hour,
+    )
+
+  // we want anything in the last 48 hs first, than anything else we have available
+  // within those two groups, distribute between the frequency buckets
+  // showing most recent first within the bucket
+  case delta1 < 48, delta2 < 48 {
+    True, True | False, False -> {
+      case int.compare(e1.bucket, e2.bucket) {
+        order.Eq -> birl.compare({ e2.entry }.published, { e1.entry }.published)
+        // swap to get newer first
+        result -> result
+      }
+    }
+    True, False -> order.Lt
+    False, True -> order.Gt
   }
 }
 
 // TODO unit test this
-fn calc_bucket(entries: List(Entry)) -> Int {
+fn calc_bucket(entries: List(FeedEntry)) -> Int {
   let by_date =
     list.sort(entries, by: fn(e1, e2) {
       birl.compare(e1.published, e2.published)
@@ -121,4 +157,4 @@ fn calc_bucket(entries: List(Entry)) -> Int {
 fn table_put(key: String, value: List(Entry)) -> ok
 
 @external(erlang, "persistent_term", "get")
-fn table_get(key: String) -> List(entry)
+fn table_get(key: String) -> List(Entry)
