@@ -1,0 +1,31 @@
+{> import feed.{type Entry}
+{> with entries as List(Entry)
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8" />
+    <title>news.olano.dev</title>
+    <link
+      type="application/atom+xml"
+      rel="alternate"
+      href="/feed.xml"
+      title="news.olano.dev"
+    />
+  </head>
+  <body>
+    <h1>news.olano.dev</h1>
+    <ol>
+      {% for entry in entries %}
+      <li>
+          <a href="{{ entry.url }}" target="_blank">{{entry.title}}</a>
+          <small>{{feed.domain(entry)}} {{feed.time_ago(entry)}}</small>
+      </li>
+      {% endfor %}
+    </ol>
+    <p>built with <a href="https://gleam.run/">Gleam</a></p>
+    <p>
+      <a href="https://github.com/facundoolano/news.olano.dev/">source code</a>
+    </p>
+  </body>
+</html>
