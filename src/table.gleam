@@ -12,9 +12,9 @@ import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
 
-const rebuild_interval = 600_000
+const rebuild_interval = 100_000
 
-const max_table_size = 1000
+const max_table_size = 200
 
 pub type Message {
   Rebuild(Subject(Message))

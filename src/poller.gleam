@@ -12,7 +12,7 @@ import gleam/string
 import parser
 import simplifile
 
-const poll_interval_ms = 3_600_000
+const poll_interval_ms = 1_800_000
 
 const cache_dir: String = "./feedcache/"
 
