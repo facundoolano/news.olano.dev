@@ -84,10 +84,31 @@ fn bucketed_entries(feed: Feed) -> List(Entry) {
 
 /// Compare entries by frequency bucket and published date (less frequent and newest come first)
 fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
-  case int.compare(e1.bucket, e2.bucket) {
-    order.Eq -> birl.compare({ e2.entry }.published, { e1.entry }.published)
-    // swap to get newer first
-    result -> result
+  let delta1 =
+    duration.blur_to(
+      birl.difference(birl.now(), e1.entry.published),
+      duration.Hour,
+    )
+
+  let delta2 =
+    duration.blur_to(
+      birl.difference(birl.now(), e2.entry.published),
+      duration.Hour,
+    )
+
+  // we want anything in the last 48 hs first, than anything else we have available
+  // within those two groups, distribute between the frequency buckets
+  // showing most recent first within the bucket
+  case delta1 < 48, delta2 < 48 {
+    True, True | False, False -> {
+      case int.compare(e1.bucket, e2.bucket) {
+        order.Eq -> birl.compare({ e2.entry }.published, { e1.entry }.published)
+        // swap to get newer first
+        result -> result
+      }
+    }
+    True, False -> order.Lt
+    False, True -> order.Gt
   }
 }
 
