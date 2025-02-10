@@ -44,6 +44,12 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
 })
     let tree = string_tree.append(tree, "
     </ol>
+    <form action=\"/next\" method=\"post\">
+        <input type=\"submit\" value=\"next page\">
+    </form>
+    <form action=\"/reset\" method=\"post\">
+        <input type=\"submit\" value=\"Reset seen\">
+    </form>
     <p>built with <a href=\"https://gleam.run/\">Gleam</a></p>
     <p>
       <a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a>
