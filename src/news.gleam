@@ -133,8 +133,8 @@ fn reset_seen(_req: Request(Connection)) -> Response(ResponseData) {
   response.new(303)
   |> response.set_body(mist.Bytes(bytes_tree.new()))
   |> response.set_header("location", "/")
-  |> response.set_cookie("from_ts", "", cookie.defaults(http.Http))
-  |> response.set_cookie("to_ts", "", cookie.defaults(http.Http))
+  |> response.set_cookie("seen_from", "", cookie.defaults(http.Http))
+  |> response.set_cookie("seen_to", "", cookie.defaults(http.Http))
 }
 
 fn atom_feed() -> Response(ResponseData) {

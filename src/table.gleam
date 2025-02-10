@@ -107,8 +107,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
         Entry(
           int.min(e.bucket, stored.bucket),
           e.entry,
-          // FIXME this doesn't seem right
-          int.min(e.created_at, stored.created_at),
+          int.max(e.created_at, stored.created_at),
         )
       }
       _ -> e
@@ -117,6 +116,12 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   })
   |> dict.values
   |> list.sort(by: entry_compare)
+  |> list.map(fn(e) {
+    case e.created_at {
+      0 -> Entry(..e, created_at: birl.monotonic_now())
+      _ -> e
+    }
+  })
   |> list.take(max_table_size)
 }
 
@@ -131,7 +136,8 @@ fn bucketed_entries(feed: Feed) -> List(Entry) {
     })
 
   let bucket = calc_bucket(entries)
-  list.map(entries, fn(entry) { Entry(bucket, entry, birl.monotonic_now()) })
+  // FIXME this zero business is funky
+  list.map(entries, fn(entry) { Entry(bucket, entry, 0) })
 }
 
 /// Compare entries by frequency bucket and published date (less frequent and newest come first)
