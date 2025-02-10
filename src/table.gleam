@@ -2,6 +2,7 @@ import birl
 import birl/duration
 import feed.{type Entry as FeedEntry}
 import gleam/dict
+import gleam/erlang/atom
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
@@ -9,7 +10,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
-import gleam/string
 import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
@@ -44,6 +44,7 @@ pub fn get() -> List(FeedEntry) {
   table_get(table_key) |> list.map(fn(e) { e.entry }) |> list.take(page_size)
 }
 
+// TODO unit test this
 pub fn filter(
   from: Option(String),
   to: Option(String),
@@ -56,16 +57,6 @@ pub fn filter(
         Some(from), Some(to) -> {
           let assert Ok(from) = int.parse(from)
           let assert Ok(to) = int.parse(to)
-
-          io.println(
-            "FILTERING from "
-            <> string.inspect(from)
-            <> " to "
-            <> string.inspect(to)
-            <> " entry created "
-            <> int.to_string(entry.created_at),
-          )
-
           entry.created_at > from || entry.created_at < to
         }
         _, _ -> True
@@ -73,21 +64,46 @@ pub fn filter(
     })
     |> list.take(page_size)
 
-  // FIXME merge previos form/to with next one
-
-  let #(from, to) = case list.first(entries), list.last(entries) {
+  let #(new_from, new_to) = case list.first(entries), list.last(entries) {
     Ok(first), Ok(last) -> {
-      #(
-        Some(int.to_string(first.created_at)),
-        Some(int.to_string(last.created_at)),
-      )
+      let new_from = first.created_at
+      let new_to = last.created_at
+      merge_ranges(from, to, new_from, new_to)
     }
     _, _ -> #(None, None)
   }
 
   let entries = list.map(entries, fn(e) { e.entry })
 
-  #(entries, from, to)
+  #(entries, new_from, new_to)
+}
+
+// FIXME I'm sure there are bugs here but YOLO
+fn merge_ranges(
+  old_from: Option(String),
+  old_to: Option(String),
+  new_from: Int,
+  new_to: Int,
+) -> #(Option(String), Option(String)) {
+  case old_from, old_to {
+    Some(""), Some(_) | Some(_), Some("") | None, _ | _, None -> #(
+      Some(int.to_string(new_from)),
+      Some(int.to_string(new_to)),
+    )
+    Some(old_from_str), Some(old_to_str) -> {
+      let assert Ok(old_from) = int.parse(old_from_str)
+      let assert Ok(old_to) = int.parse(old_to_str)
+
+      // TODO explain
+      let #(new_from, new_to) = case
+        new_to >= old_from && new_to - old_from < 100_000
+      {
+        True -> #(new_from, old_to)
+        False -> #(new_from, new_to)
+      }
+      #(Some(int.to_string(new_from)), Some(int.to_string(new_to)))
+    }
+  }
 }
 
 fn handle_message(message: Message, state: State) {
@@ -218,8 +234,9 @@ fn table_put(key: String, value: List(Entry)) -> ok
 fn table_get(key: String) -> List(Entry)
 
 @external(erlang, "erlang", "system_time")
-fn erlang_unique_int() -> Int
+fn erlang_system_time(unit: atom.Atom) -> Int
 
 fn monotonic_int() -> Int {
-  erlang_unique_int()
+  // FIXME this is not really monotonic but well
+  erlang_system_time(atom.create_from_string("microsecond"))
 }
