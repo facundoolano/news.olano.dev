@@ -1,4 +1,3 @@
-import birl
 import feed.{Feed}
 import gleam/bytes_tree
 import gleam/dict
@@ -93,31 +92,49 @@ fn home(req: Request(Connection)) -> Response(ResponseData) {
     |> mist.Bytes
 
   response.new(200)
-  |> response.set_header("Content-Type", "text/ html")
+  |> response.set_header("Content-Type", "text/html")
   |> response.set_body(body)
-  // FIXME chose scheme based on mode?
   |> response.set_cookie(
-    "from_ts",
+    "sent_from",
+    option.unwrap(sent_from, ""),
+    cookie.defaults(http.Https),
+  )
+  |> response.set_cookie(
+    "sent_to",
+    option.unwrap(sent_to, ""),
+    cookie.defaults(http.Https),
+  )
+}
+
+fn next_page(req: Request(Connection)) -> Response(ResponseData) {
+  // get the SENT cookies
+  let cookies = request.get_cookies(req) |> dict.from_list
+  let sent_from = option.from_result(dict.get(cookies, "sent_from"))
+  let sent_to = option.from_result(dict.get(cookies, "sent_to"))
+
+  // Use them to set the SEEN cookies, the previous page as seen
+  // and redirect to fetch a new page
+  response.new(303)
+  |> response.set_body(mist.Bytes(bytes_tree.new()))
+  |> response.set_header("location", "/")
+  |> response.set_cookie(
+    "seen_from",
     option.unwrap(sent_from, ""),
     cookie.defaults(http.Http),
   )
   |> response.set_cookie(
-    "to_ts",
+    "seen_to",
     option.unwrap(sent_to, ""),
     cookie.defaults(http.Http),
   )
 }
 
-fn next_page(req: Request(Connection)) -> Response(ResponseData) {
-  // read body
-  // parse from/to
-  // set to cookie
-  // return home
-  todo
-}
-
-fn reset_seen(req: Request(Connection)) -> Response(ResponseData) {
-  todo
+fn reset_seen(_req: Request(Connection)) -> Response(ResponseData) {
+  response.new(303)
+  |> response.set_body(mist.Bytes(bytes_tree.new()))
+  |> response.set_header("location", "/")
+  |> response.set_cookie("from_ts", "", cookie.defaults(http.Http))
+  |> response.set_cookie("to_ts", "", cookie.defaults(http.Http))
 }
 
 fn atom_feed() -> Response(ResponseData) {
