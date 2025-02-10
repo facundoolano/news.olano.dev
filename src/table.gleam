@@ -2,6 +2,7 @@ import birl
 import birl/duration
 import feed.{type Entry as FeedEntry}
 import gleam/dict
+import gleam/erlang/atom
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
@@ -48,8 +49,6 @@ pub fn filter(
   from: Option(String),
   to: Option(String),
 ) -> #(List(FeedEntry), Option(String), Option(String)) {
-  io.println("FILTERING" <> string.inspect(from) <> " " <> string.inspect(to))
-
   let entries =
     table_get(table_key)
     |> list.filter(fn(entry) {
@@ -58,7 +57,17 @@ pub fn filter(
         Some(from), Some(to) -> {
           let assert Ok(from) = int.parse(from)
           let assert Ok(to) = int.parse(to)
-          entry.created_at > from || entry.created_at < to
+
+          io.println(
+            "FILTERING from "
+            <> string.inspect(from)
+            <> " to "
+            <> string.inspect(to)
+            <> " entry created "
+            <> int.to_string(entry.created_at),
+          )
+
+          entry.created_at < from || entry.created_at > to
         }
         _, _ -> True
       }
@@ -116,10 +125,10 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   })
   |> dict.values
   |> list.sort(by: entry_compare)
-  |> list.map(fn(e) {
+  |> list.fold_right([], fn(acc, e) {
     case e.created_at {
-      0 -> Entry(..e, created_at: birl.monotonic_now())
-      _ -> e
+      0 -> [Entry(..e, created_at: monotonic_int()), ..acc]
+      _ -> [e, ..acc]
     }
   })
   |> list.take(max_table_size)
@@ -208,3 +217,13 @@ fn table_put(key: String, value: List(Entry)) -> ok
 
 @external(erlang, "persistent_term", "get")
 fn table_get(key: String) -> List(Entry)
+
+@external(erlang, "erlang", "unique_integer")
+fn erlang_unique_int(opts: List(atom.Atom)) -> Int
+
+fn monotonic_int() -> Int {
+  erlang_unique_int([
+    atom.create_from_string("monotonic"),
+    atom.create_from_string("positive"),
+  ])
+}
