@@ -15,7 +15,6 @@ import templates/atom_feed
 import templates/home
 
 import gleam/erlang/process
-import gleam/list
 import gleam/result
 import gleam/string
 import poller
@@ -79,16 +78,36 @@ fn run_server() {
   process.sleep_forever()
 }
 
-fn home() -> Response(ResponseData) {
+fn home(req: Request(Connection)) -> Response(ResponseData) {
+  // TODO read preexisting seen from request, if present use them to filter results
+  let cookies = request.get_cookies(req) |> dict.from_list
+  let seen_from = option.from_result(dict.get(cookies, "seen_from"))
+  let seen_to = option.from_result(dict.get(cookies, "seen_to"))
+
+  let #(entries, sent_from, sent_to) = table.filter(seen_from, seen_to)
+
   let body =
-    table.get()
+    entries
     |> home.render_tree()
     |> bytes_tree.from_string_tree()
     |> mist.Bytes
 
   response.new(200)
-  |> response.set_header("Content-Type", "text/html")
+  |> response.set_header("Content-Type", "text/ html")
   |> response.set_body(body)
+  // FIXME chose scheme based on mode?
+  |> response.set_cookie(
+    "from_ts",
+    option.unwrap(sent_from, ""),
+    cookie.defaults(http.Http),
+  )
+  |> response.set_cookie(
+    "to_ts",
+    option.unwrap(sent_to, ""),
+    cookie.defaults(http.Http),
+  )
+}
+
 fn next_page(req: Request(Connection)) -> Response(ResponseData) {
   // read body
   // parse from/to

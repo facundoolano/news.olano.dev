@@ -6,6 +6,7 @@ import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option.{type Option}
 import gleam/order
 import gleam/otp/actor
 import poller.{type Poller as Feed}
@@ -15,6 +16,8 @@ const table_key = "entry_table"
 const rebuild_interval = 100_000
 
 const max_table_size = 1000
+
+const page_size = 30
 
 pub type Message {
   Rebuild(Subject(Message))
@@ -35,8 +38,20 @@ pub fn start(feeds: List(Feed)) {
   process.send(table, Rebuild(table))
 }
 
+// TODO
 pub fn get() -> List(FeedEntry) {
-  table_get(table_key) |> list.map(fn(e) { e.entry })
+  table_get(table_key) |> list.map(fn(e) { e.entry }) |> list.take(page_size)
+}
+
+pub fn filter(
+  from: Option(String),
+  to: Option(String),
+) -> #(List(FeedEntry), Option(String), Option(String)) {
+  // FIXME fitler from to
+  // FIXME return new from to
+  let entries =
+    table_get(table_key) |> list.map(fn(e) { e.entry }) |> list.take(page_size)
+  #(entries, from, to)
 }
 
 fn handle_message(message: Message, state: State) {
