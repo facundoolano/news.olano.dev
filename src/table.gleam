@@ -2,7 +2,6 @@ import birl
 import birl/duration
 import feed.{type Entry as FeedEntry}
 import gleam/dict
-import gleam/erlang/atom
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
@@ -67,7 +66,7 @@ pub fn filter(
             <> int.to_string(entry.created_at),
           )
 
-          entry.created_at < from || entry.created_at > to
+          entry.created_at > from || entry.created_at < to
         }
         _, _ -> True
       }
@@ -218,12 +217,9 @@ fn table_put(key: String, value: List(Entry)) -> ok
 @external(erlang, "persistent_term", "get")
 fn table_get(key: String) -> List(Entry)
 
-@external(erlang, "erlang", "unique_integer")
-fn erlang_unique_int(opts: List(atom.Atom)) -> Int
+@external(erlang, "erlang", "system_time")
+fn erlang_unique_int() -> Int
 
 fn monotonic_int() -> Int {
-  erlang_unique_int([
-    atom.create_from_string("monotonic"),
-    atom.create_from_string("positive"),
-  ])
+  erlang_unique_int()
 }
