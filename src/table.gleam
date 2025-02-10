@@ -6,9 +6,10 @@ import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
+import gleam/string
 import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
@@ -47,10 +48,37 @@ pub fn filter(
   from: Option(String),
   to: Option(String),
 ) -> #(List(FeedEntry), Option(String), Option(String)) {
-  // FIXME fitler from to
-  // FIXME return new from to
+  io.println("FILTERING" <> string.inspect(from) <> " " <> string.inspect(to))
+
   let entries =
-    table_get(table_key) |> list.map(fn(e) { e.entry }) |> list.take(page_size)
+    table_get(table_key)
+    |> list.filter(fn(entry) {
+      case from, to {
+        Some(""), Some(_) | Some(_), Some("") -> True
+        Some(from), Some(to) -> {
+          let assert Ok(from) = int.parse(from)
+          let assert Ok(to) = int.parse(to)
+          entry.created_at > from || entry.created_at < to
+        }
+        _, _ -> True
+      }
+    })
+    |> list.take(page_size)
+
+  // FIXME merge previos form/to with next one
+
+  let #(from, to) = case list.first(entries), list.last(entries) {
+    Ok(first), Ok(last) -> {
+      #(
+        Some(int.to_string(first.created_at)),
+        Some(int.to_string(last.created_at)),
+      )
+    }
+    _, _ -> #(None, None)
+  }
+
+  let entries = list.map(entries, fn(e) { e.entry })
+
   #(entries, from, to)
 }
 
@@ -79,6 +107,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
         Entry(
           int.min(e.bucket, stored.bucket),
           e.entry,
+          // FIXME this doesn't seem right
           int.min(e.created_at, stored.created_at),
         )
       }
