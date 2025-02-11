@@ -10,6 +10,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
+import gleam/string
 import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
@@ -68,7 +69,8 @@ pub fn filter(
     Ok(first), Ok(last) -> {
       let new_from = first.created_at
       let new_to = last.created_at
-      merge_ranges(from, to, new_from, new_to)
+      let result = merge_ranges(from, to, new_from, new_to)
+      result
     }
     _, _ -> #(None, None)
   }
@@ -94,14 +96,17 @@ fn merge_ranges(
       let assert Ok(old_from) = int.parse(old_from_str)
       let assert Ok(old_to) = int.parse(old_to_str)
 
-      // TODO explain
-      let #(new_from, new_to) = case
-        new_to >= old_from && new_to - old_from < 100_000
-      {
-        True -> #(new_from, old_to)
-        False -> #(new_from, new_to)
-      }
-      #(Some(int.to_string(new_from)), Some(int.to_string(new_to)))
+      // FIXME try to make this work
+      // let #(new_from, new_to) = case
+      //   new_to >= old_from && new_to - old_from < 100_000
+      // {
+      //   True -> #(new_from, old_to)
+      //   False -> #(new_from, new_to)
+      // }
+      #(
+        Some(int.to_string(int.max(old_from, new_from))),
+        Some(int.to_string(int.min(old_to, new_to))),
+      )
     }
   }
 }
