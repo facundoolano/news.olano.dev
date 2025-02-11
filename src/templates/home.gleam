@@ -3,9 +3,11 @@
 import gleam/string_tree.{type StringTree}
 import gleam/list
 
-import feed.{type Entry}
+import table.{type IndexedEntry}
+import feed
+import gleam/int
 
-pub fn render_tree(entries entries: List(Entry)) -> StringTree {
+pub fn render_tree(entries entries: List(IndexedEntry)) -> StringTree {
     let tree = string_tree.from_string("")
     let tree = string_tree.append(tree, "<!DOCTYPE html>
 <html>
@@ -26,16 +28,18 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
       ")
     let tree = list.fold(entries, tree, fn(tree, entry) {
             let tree = string_tree.append(tree, "
-      <li>
+      <li value=\"")
+    let tree = string_tree.append(tree, int.to_string(entry.i))
+    let tree = string_tree.append(tree, "\">
           <a href=\"")
-    let tree = string_tree.append(tree, entry.url)
+    let tree = string_tree.append(tree, entry.e.url)
     let tree = string_tree.append(tree, "\" target=\"_blank\">")
-    let tree = string_tree.append(tree, entry.title)
+    let tree = string_tree.append(tree, entry.e.title)
     let tree = string_tree.append(tree, "</a>
           <small>")
-    let tree = string_tree.append(tree, feed.domain(entry))
+    let tree = string_tree.append(tree, feed.domain(entry.e))
     let tree = string_tree.append(tree, " ")
-    let tree = string_tree.append(tree, feed.time_ago(entry))
+    let tree = string_tree.append(tree, feed.time_ago(entry.e))
     let tree = string_tree.append(tree, "</small>
       </li>
       ")
@@ -61,7 +65,7 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
     tree
 }
 
-pub fn render(entries entries: List(Entry)) -> String {
+pub fn render(entries entries: List(IndexedEntry)) -> String {
     string_tree.to_string(render_tree(entries: entries))
 }
 

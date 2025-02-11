@@ -1,5 +1,7 @@
-{> import feed.{type Entry}
-{> with entries as List(Entry)
+{> import table.{type IndexedEntry}
+{> import feed
+{> import gleam/int
+{> with entries as List(IndexedEntry)
 <!DOCTYPE html>
 <html>
   <head>
@@ -17,9 +19,9 @@
     <h1>news.olano.dev</h1>
     <ol>
       {% for entry in entries %}
-      <li>
-          <a href="{{ entry.url }}" target="_blank">{{entry.title}}</a>
-          <small>{{feed.domain(entry)}} {{feed.time_ago(entry)}}</small>
+      <li value="{{int.to_string(entry.i)}}">
+          <a href="{{ entry.e.url }}" target="_blank">{{entry.e.title}}</a>
+          <small>{{feed.domain(entry.e)}} {{feed.time_ago(entry.e)}}</small>
       </li>
       {% endfor %}
     </ol>

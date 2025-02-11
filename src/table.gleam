@@ -10,7 +10,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/otp/actor
-import gleam/string
 import poller.{type Poller as Feed}
 
 const table_key = "entry_table"
@@ -33,6 +32,10 @@ type Entry {
   Entry(bucket: Int, entry: FeedEntry, created_at: Int)
 }
 
+pub type IndexedEntry {
+  IndexedEntry(i: Int, e: FeedEntry)
+}
+
 pub fn start(feeds: List(Feed)) {
   let state = State(feeds)
   let assert Ok(table) = actor.start(state, handle_message)
@@ -49,33 +52,46 @@ pub fn get() -> List(FeedEntry) {
 pub fn filter(
   from: Option(String),
   to: Option(String),
-) -> #(List(FeedEntry), Option(String), Option(String)) {
-  let entries =
+) -> #(List(IndexedEntry), Option(String), Option(String)) {
+  let #(_, enum_entries) =
     table_get(table_key)
+    |> list.fold(#(0, []), fn(acc, e) {
+      let #(count, entries) = acc
+
+      #(count + 1, [#(count + 1, e), ..entries])
+    })
+
+  let enum_entries: List(#(Int, Entry)) =
+    enum_entries
+    |> list.reverse()
     |> list.filter(fn(entry) {
       case from, to {
         Some(""), Some(_) | Some(_), Some("") -> True
         Some(from), Some(to) -> {
           let assert Ok(from) = int.parse(from)
           let assert Ok(to) = int.parse(to)
-          entry.created_at > from || entry.created_at < to
+          { entry.1 }.created_at > from || { entry.1 }.created_at < to
         }
         _, _ -> True
       }
     })
     |> list.take(page_size)
 
-  let #(new_from, new_to) = case list.first(entries), list.last(entries) {
+  let #(new_from, new_to) = case
+    list.first(enum_entries),
+    list.last(enum_entries)
+  {
     Ok(first), Ok(last) -> {
-      let new_from = first.created_at
-      let new_to = last.created_at
+      let new_from = { first.1 }.created_at
+      let new_to = { last.1 }.created_at
       let result = merge_ranges(from, to, new_from, new_to)
       result
     }
     _, _ -> #(None, None)
   }
 
-  let entries = list.map(entries, fn(e) { e.entry })
+  let entries =
+    list.map(enum_entries, fn(e) { IndexedEntry(e.0, { e.1 }.entry) })
 
   #(entries, new_from, new_to)
 }
