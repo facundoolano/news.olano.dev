@@ -49,6 +49,7 @@ pub fn get() -> List(FeedEntry) {
 }
 
 // TODO unit test this
+// behold what's probably the worst piece of code I've ever written
 pub fn filter(
   from: Option(String),
   to: Option(String),
@@ -96,7 +97,7 @@ pub fn filter(
   #(entries, new_from, new_to)
 }
 
-// FIXME I'm sure there are bugs here but YOLO
+// FIXME I'm sure there are bugs here
 fn merge_ranges(
   old_from: Option(String),
   old_to: Option(String),
@@ -119,6 +120,7 @@ fn merge_ranges(
       //   True -> #(new_from, old_to)
       //   False -> #(new_from, new_to)
       // }
+      // FIXME this makes it seem like it works but I'm sure it doesn't really
       #(
         Some(int.to_string(int.max(old_from, new_from))),
         Some(int.to_string(int.min(old_to, new_to))),
