@@ -33,16 +33,25 @@ fn setup_feeds() {
     |> string.split("\n")
     |> list.fold([], fn(acc, line) {
       case string.split(line, ",") {
-        // NOTE this should likely be done by a supervisor?
-        [name, url] ->
-          case poller.start(Feed(name, url)) {
-            Ok(poller) -> [poller, ..acc]
-            _ -> acc
-          }
+        [name, url] -> [Feed(name, url), ..acc]
         _ -> acc
       }
     })
-  Ok(table.start(feeds))
+
+  // TODO this should be done by the poller supervisor
+  let pollers =
+    list.fold(feeds, [], fn(acc, feed) {
+      case poller.start(feed) {
+        Ok(poller) -> [poller, ..acc]
+        _ -> {
+          io.println("error creating poller for " <> feed.name)
+          acc
+        }
+      }
+    })
+
+  // TODO this should be done by the table supervisor
+  Ok(table.start(pollers))
 }
 
 fn run_server() {
