@@ -27,7 +27,7 @@ type State {
 }
 
 type Entry {
-  Entry(bucket: Int, entry: FeedEntry, created_at: Int)
+  Entry(bucket: Int, entry: FeedEntry)
 }
 
 pub fn start(feeds: List(Feed)) {
@@ -63,11 +63,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
     // index by url to remove duplicates, preserving the earliest created at and the lower bucket
     let merged = case dict.get(acc, e.entry.url) {
       Ok(stored) -> {
-        Entry(
-          int.min(e.bucket, stored.bucket),
-          e.entry,
-          int.min(e.created_at, stored.created_at),
-        )
+        Entry(int.min(e.bucket, stored.bucket), e.entry)
       }
       _ -> e
     }
@@ -89,7 +85,7 @@ fn bucketed_entries(feed: Feed) -> List(Entry) {
     })
 
   let bucket = calc_bucket(entries)
-  list.map(entries, fn(entry) { Entry(bucket, entry, birl.monotonic_now()) })
+  list.map(entries, fn(entry) { Entry(bucket, entry) })
 }
 
 /// Compare entries by frequency bucket and published date (less frequent and newest come first)
