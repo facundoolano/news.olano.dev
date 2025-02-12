@@ -3,6 +3,6 @@
 /build
 erl_crash.dump
 
-feedcache/
+priv/feedcache
 
 

@@ -1,4 +1,5 @@
 import feed.{type Entry, type Feed, Feed}
+import gleam/erlang
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
 import gleam/http/response
@@ -13,8 +14,6 @@ import parser
 import simplifile
 
 const poll_interval_ms = 1_800_000
-
-const cache_dir: String = "./feedcache/"
 
 pub type Poller =
   Subject(Message)
@@ -49,7 +48,7 @@ fn init(feed: Feed) {
   // if there's a previously cached file, parse it now and request later
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
-    simplifile.read(cache_dir <> feed.name)
+    simplifile.read(cache_dir() <> feed.name)
     |> result.map_error(string.inspect)
     |> result.try(parser.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
@@ -124,9 +123,9 @@ fn fetch(state: State) -> Result(#(State, String), String) {
     status if status >= 400 -> Error("response error " <> int.to_string(status))
     _ -> {
       // cache contents for next time
-      let path = cache_dir <> state.feed.name
+      let path = cache_dir() <> state.feed.name
       let _ =
-        result.try(simplifile.create_directory_all(cache_dir), fn(_) {
+        result.try(simplifile.create_directory_all(cache_dir()), fn(_) {
           simplifile.write(path, resp.body)
         })
 
@@ -136,4 +135,9 @@ fn fetch(state: State) -> Result(#(State, String), String) {
       Ok(#(State(..state, etag: etag, last_modified: last_modified), resp.body))
     }
   }
+}
+
+fn cache_dir() -> String {
+  let assert Ok(cachedir) = erlang.priv_directory("news")
+  cachedir <> "/feedcache/"
 }

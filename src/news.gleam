@@ -1,5 +1,6 @@
 import feed.{Feed}
 import gleam/bytes_tree
+import gleam/erlang
 import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
@@ -23,7 +24,10 @@ pub fn main() {
 }
 
 fn setup_feeds() {
-  use contents <- result.try(simplifile.read("feeds.csv"))
+  use privdir <- result.try(erlang.priv_directory("news"))
+  use contents <- result.try(
+    simplifile.read(privdir <> "/feeds.csv") |> result.replace_error(Nil),
+  )
   let feeds =
     contents
     |> string.split("\n")
