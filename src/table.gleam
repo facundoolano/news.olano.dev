@@ -16,6 +16,8 @@ const rebuild_interval = 100_000
 
 const max_table_size = 100
 
+const cut_off_months = 4
+
 pub type Message {
   Rebuild(Subject(Message))
 }
@@ -83,7 +85,7 @@ fn bucketed_entries(feed: Feed) -> List(Entry) {
       // exclude entries over a yer old, and do it before calculating bucket
       // so a later bloomer (?) doesn't take all the spots
       let delta = birl.difference(birl.now(), e.published)
-      duration.blur_to(delta, duration.Month) < 12
+      duration.blur_to(delta, duration.Month) < cut_off_months
     })
 
   let bucket = calc_bucket(entries)
