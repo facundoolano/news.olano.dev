@@ -19,9 +19,27 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
       href=\"/feed\"
       title=\"news.olano.dev\"
     />
+    <style type=\"text/css\">
+     body {
+         max-width: 60em;
+         margin: 0 auto;
+         padding: 0 1rem;
+         width: auto;
+         font-family: Tahoma, Verdana, Arial, sans-serif;
+         line-height: 1.6;
+         font-size: 1rem;
+     }
+     h1,footer {
+         text-align: center;
+     }
+     small {
+         display: block;
+     }
+    </style>
   </head>
   <body>
-    <h1>news.olano.dev</h1>
+      <h1>news.olano.dev</h1>
+      <br/>
     <ol>
       ")
     let tree = list.fold(entries, tree, fn(tree, entry) {
@@ -34,7 +52,7 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
     let tree = string_tree.append(tree, "</a>
           <small>")
     let tree = string_tree.append(tree, feed.domain(entry))
-    let tree = string_tree.append(tree, " ")
+    let tree = string_tree.append(tree, " | ")
     let tree = string_tree.append(tree, feed.time_ago(entry))
     let tree = string_tree.append(tree, "</small>
       </li>
@@ -44,10 +62,14 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
 })
     let tree = string_tree.append(tree, "
     </ol>
-    <p>built with <a href=\"https://gleam.run/\">Gleam</a></p>
-    <p>
-      <a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a>
-    </p>
+    <br/>
+    <footer>
+    <span>built with <a href=\"https://gleam.run/\">Gleam</a> | </span>
+    <span>
+        <a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a>
+    </span>
+    </footer>
+    <br/>
   </body>
 </html>
 ")
