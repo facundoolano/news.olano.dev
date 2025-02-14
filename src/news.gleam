@@ -19,8 +19,9 @@ import simplifile
 import table
 
 pub fn main() {
+  let assert Ok(_) = run_server()
   let assert Ok(_) = setup_feeds()
-  run_server()
+  process.sleep_forever()
 }
 
 fn setup_feeds() {
@@ -67,8 +68,6 @@ fn run_server() {
     |> mist.new
     |> mist.port(3210)
     |> mist.start_http
-
-  process.sleep_forever()
 }
 
 fn home() -> Response(ResponseData) {
