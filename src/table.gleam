@@ -8,7 +8,7 @@ import gleam/io
 import gleam/list
 import gleam/order
 import gleam/otp/actor
-import poller.{type Poller as Feed}
+import poller.{type Poller}
 
 const table_key = "entry_table"
 
@@ -20,21 +20,26 @@ const cut_off_months = 4
 
 pub type Message {
   Rebuild(Subject(Message))
+  RegisterFeed(String, Poller)
 }
 
 type State {
-  State(feeds: List(Feed))
+  State(feeds: dict.Dict(String, Poller))
 }
 
 type Entry {
   Entry(bucket: Int, entry: FeedEntry)
 }
 
-pub fn start(feeds: List(Feed)) {
-  let state = State(feeds)
+pub fn start() {
+  let state = State(dict.new())
   let assert Ok(table) = actor.start(state, handle_message)
   table_put(table_key, [])
-  process.send(table, Rebuild(table))
+  process.send_after(table, 10_000, Rebuild(table))
+}
+
+pub fn register(table: Subject(Message), name: String, poller: Poller) {
+  process.send(table, RegisterFeed(name, poller))
 }
 
 pub fn get() -> List(FeedEntry) {
@@ -43,8 +48,11 @@ pub fn get() -> List(FeedEntry) {
 
 fn handle_message(message: Message, state: State) {
   let state = case message {
+    RegisterFeed(name, poller) -> {
+      State(dict.insert(state.feeds, name, poller))
+    }
     Rebuild(self) -> {
-      let entries = latest_entries(state.feeds)
+      let entries = latest_entries(dict.values(state.feeds))
       table_put(table_key, entries)
       io.println("refreshed table")
 
@@ -56,7 +64,7 @@ fn handle_message(message: Message, state: State) {
 }
 
 /// TODO explain
-fn latest_entries(feeds: List(Feed)) -> List(Entry) {
+fn latest_entries(feeds: List(Poller)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
   |> list.append(table_get(table_key))
   |> list.fold(dict.new(), fn(acc: dict.Dict(String, Entry), e) {
@@ -74,7 +82,7 @@ fn latest_entries(feeds: List(Feed)) -> List(Entry) {
   |> list.take(max_table_size)
 }
 
-fn bucketed_entries(feed: Feed) -> List(Entry) {
+fn bucketed_entries(feed: Poller) -> List(Entry) {
   let entries =
     poller.entries(feed)
     |> list.filter(fn(e) {
