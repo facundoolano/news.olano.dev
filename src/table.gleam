@@ -31,11 +31,12 @@ type Entry {
   Entry(bucket: Int, entry: FeedEntry)
 }
 
-pub fn start() {
+pub fn start() -> Subject(Message) {
   let state = State(dict.new())
   let assert Ok(table) = actor.start(state, handle_message)
   table_put(table_key, [])
   process.send_after(table, 10_000, Rebuild(table))
+  table
 }
 
 pub fn register(table: Subject(Message), name: String, poller: Poller) {

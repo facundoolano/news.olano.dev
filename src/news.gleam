@@ -7,6 +7,7 @@ import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
 import mist.{type Connection, type ResponseData}
+import table_sup
 import templates/atom_feed
 import templates/home
 
@@ -14,12 +15,11 @@ import gleam/erlang/process
 import gleam/list
 import gleam/result
 import gleam/string
-import poller
 import simplifile
 import table
 
 pub fn main() {
-  let assert Ok(Nil) = setup_feeds()
+  let assert Ok(_) = setup_feeds()
   run_server()
 }
 
@@ -38,20 +38,7 @@ fn setup_feeds() {
       }
     })
 
-  // TODO this should be done by the poller supervisor
-  let pollers =
-    list.fold(feeds, [], fn(acc, feed) {
-      case poller.start(feed) {
-        Ok(poller) -> [poller, ..acc]
-        _ -> {
-          io.println("error creating poller for " <> feed.name)
-          acc
-        }
-      }
-    })
-
-  // TODO this should be done by the table supervisor
-  Ok(table.start(pollers))
+  table_sup.start(feeds)
 }
 
 fn run_server() {
