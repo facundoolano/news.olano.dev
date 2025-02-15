@@ -1,117 +1,43 @@
 import birl
 import feed.{type Entry, Entry}
 import gleam/dict
-import gleam/erlang
-import gleam/erlang/atom
-import gleam/erlang/charlist
 import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
 import gleam/uri
 
+/// Given an xml document of an Atom or RSS feed, parse it into a list of entries.
 pub fn parse(body: String) -> Result(List(Entry), String) {
-  // parsing here just to check the tag, then parsing again in the internal atom/rss
-  // helpers because if I try to reuse the structure the type checker complaints
-  // about the differing structures of the two formats
-  // hacky but beats figuring out the gleam decoder stuff
-  case parse_xml_root(body) {
-    Ok(#("feed", _)) ->
-      parse_atom_feed(body) |> result.replace_error("atom feed parse error")
-    Ok(#("rss", _)) ->
-      parse_rss_feed(body) |> result.replace_error("rss feed parse error")
-    Ok(#(other, _)) -> Error("unknown feed type " <> other)
-    Error(err) -> Error("unknown feed type " <> string.inspect(err))
+  case parse_feed(body) {
+    #("error", msg) -> Error(string.inspect(msg))
+    #(feed_type, entries) -> {
+      let entries =
+        list.fold(entries, [], fn(acc, e) {
+          case parse_entry(feed_type, e) {
+            Ok(entry) -> [entry, ..acc]
+            _ -> acc
+          }
+        })
+      Ok(entries)
+    }
   }
 }
 
-fn parse_rss_feed(body: String) -> Result(List(Entry), Nil) {
-  use #(_, elements) <- result.try(parse_xml_root(body))
-
-  case elements {
-    [#(_, _, elements), ..] -> {
-      list.fold(elements, [], fn(acc, entry) {
-        case entry {
-          #("item", _, etc) -> {
-            parse_rss_entry(etc)
-            |> result.map(fn(entry) { [entry, ..acc] })
-            |> result.unwrap(acc)
-          }
-          _ -> acc
-        }
-      })
-      |> list.reverse
-      |> Ok
-    }
+/// Takes the erlang generated Entry map and wraps it in proper types
+fn parse_entry(
+  feed_type: String,
+  entry: dict.Dict(String, String),
+) -> Result(Entry, Nil) {
+  let title = dict.get(entry, "title")
+  let url = dict.get(entry, "url") |> result.try(normalize)
+  let published = dict.get(entry, "published")
+  let published = case feed_type {
+    "atom" -> result.try(published, birl.from_naive)
+    "rss" -> result.try(published, birl.from_http)
     _ -> Error(Nil)
   }
-}
 
-fn parse_atom_feed(body: String) -> Result(List(Entry), Nil) {
-  use #(_, root) <- result.try(parse_xml_root(body))
-
-  list.fold(root, [], fn(acc, entry) {
-    case entry {
-      #("entry", _, elements) -> {
-        parse_atom_entry(elements)
-        |> result.map(fn(entry) { [entry, ..acc] })
-        |> result.unwrap(acc)
-      }
-      _ -> acc
-    }
-  })
-  |> list.reverse
-  |> Ok
-}
-
-fn parse_rss_entry(etc) -> Result(Entry, Nil) {
-  let values =
-    list.fold(etc, dict.new(), fn(entry, element) {
-      case element {
-        #("title", _, [title]) ->
-          dict.insert(entry, "title", charlist.to_string(title))
-        #("pubDate", _, [published]) -> {
-          dict.insert(entry, "published", charlist.to_string(published))
-        }
-        #("link", _, [link]) -> {
-          dict.insert(entry, "url", charlist.to_string(link))
-        }
-        #(_, _, _) -> entry
-      }
-    })
-
-  let title = dict.get(values, "title")
-  let url = dict.get(values, "url") |> result.try(normalize)
-  let published = dict.get(values, "published") |> result.try(birl.from_http)
-  case title, url, published {
-    Ok(title), Ok(url), Ok(published) -> Ok(Entry(title, url, published))
-    _, _, _ -> Error(Nil)
-  }
-}
-
-fn parse_atom_entry(elements: List(#(_, _, _))) -> Result(Entry, Nil) {
-  let values =
-    list.fold(elements, dict.new(), fn(entry, element) {
-      case element {
-        #("title", _, [title]) ->
-          dict.insert(entry, "title", charlist.to_string(title))
-        #("published", _, [published]) -> {
-          dict.insert(entry, "published", charlist.to_string(published))
-        }
-        #("link", link_attrs, _) -> {
-          dict.from_list(link_attrs)
-          |> dict.get("href")
-          |> result.map(charlist.to_string)
-          |> result.map(fn(url) { dict.insert(entry, "url", url) })
-          |> result.unwrap(entry)
-        }
-        #(_, _, _) -> entry
-      }
-    })
-
-  let title = dict.get(values, "title")
-  let url = dict.get(values, "url") |> result.try(normalize)
-  let published = dict.get(values, "published") |> result.try(birl.from_naive)
   case title, url, published {
     Ok(title), Ok(url), Ok(published) -> Ok(Entry(title, url, published))
     _, _, _ -> Error(Nil)
@@ -130,24 +56,7 @@ fn normalize(url: String) -> Result(String, Nil) {
   Ok(url)
 }
 
-fn parse_xml_root(body: String) -> Result(#(String, root2), Nil) {
-  let parsed_safe =
-    erlang.rescue(fn() {
-      parse_xml(body, [
-        #(atom.create_from_string("nameFun"), fn(name, _, _) {
-          charlist.to_string(name)
-        }),
-      ])
-    })
-
-  case parsed_safe {
-    Ok(#(_ok, root, _tail)) -> {
-      let #(tag, _, elements) = root
-      Ok(#(tag, elements))
-    }
-    _ -> Error(Nil)
-  }
-}
-
-@external(erlang, "erlsom", "simple_form")
-fn parse_xml(doc: String, options: List(a)) -> #(result, item, String)
+// Rely on erlang to call the xml parsing library and traversing the resulting
+// (very dynamic) structure.
+@external(erlang, "parser_ffi", "parse_feed")
+fn parse_feed(doc: String) -> #(String, List(dict.Dict(String, String)))
