@@ -23,6 +23,8 @@ pub type Message {
   GetEntries(Subject(List(Entry)))
 }
 
+/// Create a poller actor that will periodically fetch entries from an RSS/Atom feed,
+/// parse, and save them locally.
 pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
   actor.start_spec(actor.Spec(
     init: fn() { init(feed) },

@@ -24,6 +24,9 @@ pub fn main() {
   process.sleep_forever()
 }
 
+/// Read the list of feeds to pull entries from from the configuration,
+/// build a supervision tree of feed poller workers,
+/// and a table manager worker to track the current list of entries.
 fn setup_feeds() {
   use privdir <- result.try(erlang.priv_directory("news"))
   use contents <- result.try(
@@ -42,6 +45,7 @@ fn setup_feeds() {
   table_sup.start(feeds)
 }
 
+/// Run an HTTP server to serve the entry list and the atom feed
 fn run_server() {
   let not_found =
     response.new(404)

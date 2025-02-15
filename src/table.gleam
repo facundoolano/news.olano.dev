@@ -42,10 +42,12 @@ pub fn start() -> Table {
   table
 }
 
+/// Add a poller to the table manager process, so its entries are included when refreshing the table.
 pub fn register(table: Table, name: String, poller: Poller) {
   process.send(table, RegisterFeed(name, poller))
 }
 
+/// Return the current list of entries, sorted by "inverted frequency".
 pub fn get() -> List(FeedEntry) {
   table_get(table_key) |> list.map(fn(e) { e.entry })
 }
@@ -67,7 +69,11 @@ fn handle_message(message: Message, state: State) {
   actor.continue(state)
 }
 
-/// TODO explain
+/// Build a new list of entries by merging the current table with the latest
+/// list from each tracked feed. The entries are sorted so the feeds which
+/// publish less frequently appear first.
+/// The rationale is that, assuming all feeds provide relevant content, we want
+/// to push rare feeds to the top so they don't get "buried" by the more spammy ones.
 fn latest_entries(feeds: List(Poller)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
   |> list.append(table_get(table_key))
@@ -131,6 +137,10 @@ fn entry_compare(e1: Entry, e2: Entry) -> order.Order {
 }
 
 // TODO unit test this
+/// Calculate the frequency bucket of the feed, by checking the average post
+/// frequency from the current entry list. The higher rate the higher bucket.
+/// Ported from feedi:
+/// https://github.com/facundoolano/feedi/blob/51ec8e5e4b2c93b70c366f9306ca3e3963bf81c1/feedi/models.py#L279-L289
 fn calc_bucket(entries: List(FeedEntry)) -> Int {
   let by_date =
     list.sort(entries, by: fn(e1, e2) {
