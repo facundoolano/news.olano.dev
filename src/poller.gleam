@@ -10,7 +10,6 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
-import parser
 import simplifile
 
 const poll_interval_ms = 1_800_000
@@ -52,7 +51,7 @@ fn init(feed: Feed) {
   let #(entries, interval) =
     simplifile.read(cache_dir() <> feed.name)
     |> result.map_error(string.inspect)
-    |> result.try(parser.parse)
+    |> result.try(feed.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
 
@@ -76,7 +75,7 @@ fn handle_message(message: Message, state: State) {
     PollFeed(self) -> {
       let new_state = case fetch(state) {
         Ok(#(new_state, body)) ->
-          case parser.parse(body) {
+          case feed.parse(body) {
             Ok(entries) -> {
               io.println("OK " <> state.feed.url)
               State(..new_state, entries: entries)
