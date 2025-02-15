@@ -52,5 +52,19 @@ parse_atom_entry([_|Rest], Acc) ->
 
 
 
-parse_rss(Elements)->
-    Elements.
+parse_rss(Elements) ->
+    Entries = lists:foldl(fun({<<"item">>, _, Attrs}, Acc) -> [parse_rss_entry(Attrs, #{}) |Acc];
+                             (_, Acc) -> Acc
+                          end, [], Elements),
+    Entries.
+
+parse_rss_entry([], Acc) ->
+    Acc;
+parse_rss_entry([{<<"title">>, _, [Title]}|Rest], Acc) ->
+    parse_rss_entry(Rest, Acc#{ <<"title">> => list_to_binary(Title)});
+parse_rss_entry([{<<"pubDate">>, _, [Published]}|Rest], Acc) ->
+    parse_rss_entry(Rest, Acc#{ <<"published">> => list_to_binary(Published)});
+parse_rss_entry([{<<"link">>, _, [Url]}|Rest], Acc) ->
+    parse_rss_entry(Rest, Acc#{ <<"url">> => list_to_binary(Url)});
+parse_rss_entry([_|Rest], Acc) ->
+    parse_rss_entry(Rest, Acc).
