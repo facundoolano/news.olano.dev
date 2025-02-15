@@ -7,6 +7,7 @@ import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
 import mist.{type Connection, type ResponseData}
+import table_sup
 import templates/atom_feed
 import templates/home
 
@@ -14,13 +15,13 @@ import gleam/erlang/process
 import gleam/list
 import gleam/result
 import gleam/string
-import poller
 import simplifile
 import table
 
 pub fn main() {
-  let assert Ok(Nil) = setup_feeds()
-  run_server()
+  let assert Ok(_) = run_server()
+  let assert Ok(_) = setup_feeds()
+  process.sleep_forever()
 }
 
 fn setup_feeds() {
@@ -33,16 +34,12 @@ fn setup_feeds() {
     |> string.split("\n")
     |> list.fold([], fn(acc, line) {
       case string.split(line, ",") {
-        // NOTE this should likely be done by a supervisor?
-        [name, url] ->
-          case poller.start(Feed(name, url)) {
-            Ok(poller) -> [poller, ..acc]
-            _ -> acc
-          }
+        [name, url] -> [Feed(name, url), ..acc]
         _ -> acc
       }
     })
-  Ok(table.start(feeds))
+
+  table_sup.start(feeds)
 }
 
 fn run_server() {
@@ -71,8 +68,6 @@ fn run_server() {
     |> mist.new
     |> mist.port(3210)
     |> mist.start_http
-
-  process.sleep_forever()
 }
 
 fn home() -> Response(ResponseData) {
