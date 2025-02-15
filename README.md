@@ -13,7 +13,7 @@ The list of entries is kept in memory and rebuilt every time the application sta
 - `src/templates/`: Defines a couple of [matcha](https://github.com/michaeljones/matcha) templates for the home page and the atom feed xml.
 - `src/feed.gleam`: Basic Feed and Entry types, and functions to helpers to build them from parsed xml files.
 - `src/parser.erl`: Erlang helper wrapping around [erlsom](https://github.com/willemdj/erlsom) to simplify extracting basic link data from atom and rss feeds.
-- `src/poller.gleam`: [gleam/otp/actor](https://hexdocs.pm/gleam_otp/gleam/otp/actor.html) (Gleam equivalent of a [gen_server](https://www.erlang.org/docs/24/man/gen_server)) that peridically fetches the xml from a source feed url and parses its entries.
+- `src/poller.gleam`: [gleam/otp/actor](https://hexdocs.pm/gleam_otp/gleam/otp/actor.html) (Gleam equivalent of a [gen_server](https://www.erlang.org/docs/24/man/gen_server)) that periodically fetches the xml from a source feed url and parses its entries.
 - `src/table.gleam`: a worker process that manages a sorted list of entries by merging the output of all poller processes. The table is stored to an erlang [persistent term](https://www.erlang.org/doc/apps/erts/persistent_term.html#get/0), to make it globally available without process communication.
 - `src/table_sup.gleam`: Defines a supervision tree with a supervisor for the table and another for the list of poller actors. If the table process dies, the rest of the processes are restarted.
 
