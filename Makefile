@@ -5,7 +5,7 @@ deploy:
 	ssh $(SSH) "chown -R $(USER):$(USER) /home/$(USER)/gleam_news/ && sudo systemctl restart news"
 
 build:
-	gleam export erlang-shipment
+	gleam export erlang-shipment && rm -rf rm build/erlang-shipment/news/priv/feedcache/
 
 templates:
 	matcha && gleam format src
