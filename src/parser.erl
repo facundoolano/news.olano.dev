@@ -1,4 +1,4 @@
--module(parser_ffi).
+-module(parser).
 -export([parse_feed/1]).
 
 parse_feed(Body) ->

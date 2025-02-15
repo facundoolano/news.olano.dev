@@ -7,7 +7,7 @@ main([Filename]) ->
     case file:read_file(Filename) of
         {ok, Content} ->
             %% Parse the XML content
-            case parser_ffi:parse_feed(Content) of
+            case parser:parse_feed(Content) of
                 {ok, <<"rss">>, Elements} ->
                     io:format("Parsed RSS: ~p~n", [Elements]);
                 {ok, <<"atom">>, Elements} ->
