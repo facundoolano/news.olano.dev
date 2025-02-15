@@ -12,6 +12,8 @@ import poller.{type Poller}
 
 const table_key = "entry_table"
 
+const subject_key = "entry_table_subject"
+
 const rebuild_interval = 100_000
 
 const max_table_size = 100
@@ -37,19 +39,25 @@ type Entry {
 pub fn start() -> Table {
   let state = State(dict.new())
   let assert Ok(table) = actor.start(state, handle_message)
-  table_put(table_key, [])
+  put_entries(table_key, [])
   process.send_after(table, 1000, Rebuild(table))
+
+  // using a persistent term here is a hacky work around to the complexities
+  // of the gleam_top supervisors and the lack of named processes
+  put_subject(subject_key, table)
+
   table
 }
 
 /// Add a poller to the table manager process, so its entries are included when refreshing the table.
-pub fn register(table: Table, name: String, poller: Poller) {
+pub fn register(name: String, poller: Poller) {
+  let table = get_subject(subject_key)
   process.send(table, RegisterFeed(name, poller))
 }
 
 /// Return the current list of entries, sorted by "inverted frequency".
 pub fn get() -> List(FeedEntry) {
-  table_get(table_key) |> list.map(fn(e) { e.entry })
+  get_entries(table_key) |> list.map(fn(e) { e.entry })
 }
 
 fn handle_message(message: Message, state: State) {
@@ -59,7 +67,7 @@ fn handle_message(message: Message, state: State) {
     }
     Rebuild(self) -> {
       let entries = latest_entries(dict.values(state.feeds))
-      table_put(table_key, entries)
+      put_entries(table_key, entries)
       io.println("refreshed table")
 
       process.send_after(self, rebuild_interval, Rebuild(self))
@@ -76,7 +84,7 @@ fn handle_message(message: Message, state: State) {
 /// to push rare feeds to the top so they don't get "buried" by the more spammy ones.
 fn latest_entries(feeds: List(Poller)) -> List(Entry) {
   list.flat_map(feeds, bucketed_entries)
-  |> list.append(table_get(table_key))
+  |> list.append(get_entries(table_key))
   |> list.fold(dict.new(), fn(acc: dict.Dict(String, Entry), e) {
     // index by url to remove duplicates, preserving the earliest created at and the lower bucket
     let merged = case dict.get(acc, e.entry.url) {
@@ -174,7 +182,13 @@ fn calc_bucket(entries: List(FeedEntry)) -> Int {
 }
 
 @external(erlang, "persistent_term", "put")
-fn table_put(key: String, value: List(Entry)) -> ok
+fn put_entries(key: String, value: List(Entry)) -> ok
 
 @external(erlang, "persistent_term", "get")
-fn table_get(key: String) -> List(Entry)
+fn get_entries(key: String) -> List(Entry)
+
+@external(erlang, "persistent_term", "put")
+fn put_subject(key: String, value: Table) -> ok
+
+@external(erlang, "persistent_term", "get")
+fn get_subject(key: String) -> Table
