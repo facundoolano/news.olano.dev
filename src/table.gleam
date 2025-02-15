@@ -18,6 +18,9 @@ const max_table_size = 100
 
 const cut_off_months = 4
 
+pub type Table =
+  Subject(Message)
+
 pub type Message {
   Rebuild(Subject(Message))
   RegisterFeed(String, Poller)
@@ -31,7 +34,7 @@ type Entry {
   Entry(bucket: Int, entry: FeedEntry)
 }
 
-pub fn start() -> Subject(Message) {
+pub fn start() -> Table {
   let state = State(dict.new())
   let assert Ok(table) = actor.start(state, handle_message)
   table_put(table_key, [])
@@ -39,7 +42,7 @@ pub fn start() -> Subject(Message) {
   table
 }
 
-pub fn register(table: Subject(Message), name: String, poller: Poller) {
+pub fn register(table: Table, name: String, poller: Poller) {
   process.send(table, RegisterFeed(name, poller))
 }
 
