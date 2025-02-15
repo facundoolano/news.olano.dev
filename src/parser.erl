@@ -1,3 +1,6 @@
+%% Wrapper around erlsom to extract a list of maps for the entries of rss and atom xml documents.
+%% Since the output structure of erlsom changes from one format to another, it's easier to make it
+%% uniform in erlang before wrapping them in gleam types.
 -module(parser).
 -export([parse_feed/1]).
 
