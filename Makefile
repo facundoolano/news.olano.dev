@@ -1,4 +1,7 @@
-.PHONY: deploy build templates
+.PHONY: run deploy build templates
+
+run:
+	gleam run
 
 deploy:
 	rsync -avz --progress build/erlang-shipment $(SSH):/home/$(USER)/gleam_news/ && \
