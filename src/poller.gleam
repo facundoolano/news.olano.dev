@@ -85,6 +85,10 @@ fn handle_message(message: Message, state: State) {
               state
             }
           }
+        Error("not modified") -> {
+          io.println("Not Modified " <> state.feed.url)
+          state
+        }
         Error(error) -> {
           io.println("ERROR fetching " <> state.feed.url <> " " <> error)
           state
@@ -121,6 +125,8 @@ fn fetch(state: State) -> Result(#(State, String), String) {
   use resp <- result.try(maybe_resp)
 
   case resp.status {
+    // TODO this is not really an error, introduce proper types to handle gracefully
+    304 -> Error("not modified")
     status if status >= 400 -> Error("response error " <> int.to_string(status))
     _ -> {
       // cache contents for next time
