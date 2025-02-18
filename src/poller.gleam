@@ -33,6 +33,7 @@ pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
+  // FIXME use try call here
   actor.call(feed, GetEntries(_), 10_000)
 }
 
@@ -45,6 +46,8 @@ type State {
   )
 }
 
+/// Custom init function to read the file cache if any or do an initial polling.
+/// Done here so process init doesn't slow down the rest of the app init.
 fn init(feed: Feed) {
   // if there's a previously cached file, parse it now and request later
   // otherwise schedule to request now (after initialization, with a random delay)
@@ -56,8 +59,11 @@ fn init(feed: Feed) {
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
 
   let state = State(feed, entries, None, None)
+
+  // by default the actor will handle messages sent through the subject returned by start_spec
+  // here I want to send a message to the actor from within init, so I need a new subject and
+  // a selector that picks up messages sent to it
   let subject = process.new_subject()
-  // I don't really understand what this means
   let selector =
     process.new_selector() |> process.selecting(subject, fn(x) { x })
 
