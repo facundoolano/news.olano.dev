@@ -79,24 +79,19 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      let new_state = case fetch(state) {
-        Ok(#(new_state, body)) ->
-          case feed.parse(body) {
-            Ok(entries) -> {
-              io.println("OK " <> state.feed.url)
-              State(..new_state, entries: entries)
-            }
-            Error(error) -> {
-              io.println("ERROR parsing " <> state.feed.url <> " " <> error)
-              state
-            }
-          }
-        Error("not modified") -> {
-          io.println("Not Modified " <> state.feed.url)
-          state
+      let result = {
+        use #(new_state, body) <- result.try(fetch(state))
+        use entries <- result.try(feed.parse(body))
+        Ok(State(..new_state, entries: entries))
+      }
+
+      let new_state = case result {
+        Ok(new_state) -> {
+          io.println("OK " <> state.feed.url)
+          new_state
         }
         Error(error) -> {
-          io.println("ERROR fetching " <> state.feed.url <> " " <> error)
+          io.println("ERROR polling " <> state.feed.url <> " " <> error)
           state
         }
       }
