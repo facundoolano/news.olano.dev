@@ -10,6 +10,14 @@ pub type Feed {
   Feed(name: String, url: String)
 }
 
+pub type FeedError {
+  NotModified
+  RequestError
+  ResponseError(status: Int)
+  ParsingError(msg: String)
+  FileError
+}
+
 pub type Entry {
   Entry(title: String, url: String, published: birl.Time)
 }
@@ -25,9 +33,9 @@ pub fn domain(entry: Entry) -> String {
 }
 
 /// Given an xml document of an Atom or RSS feed, parse it into a list of entries.
-pub fn parse(body: String) -> Result(List(Entry), String) {
+pub fn parse(body: String) -> Result(List(Entry), FeedError) {
   case parse_feed(body) {
-    #("error", msg) -> Error(string.inspect(msg))
+    #("error", msg) -> Error(ParsingError(string.inspect(msg)))
     #(feed_type, entries) -> {
       let entries =
         list.fold(entries, [], fn(acc, e) {

@@ -1,4 +1,7 @@
-import feed.{type Entry, type Feed, Feed}
+import feed.{
+  type Entry, type Feed, type FeedError, Feed, FileError, NotModified,
+  RequestError, ResponseError,
+}
 import gleam/erlang
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
@@ -16,13 +19,6 @@ const poll_interval_ms = 1_800_000
 
 pub type Poller =
   Subject(Message)
-
-type PollingError {
-  NotModified
-  RequestError
-  ResponseError(status: Int)
-  ParsingError
-}
 
 pub type Message {
   PollFeed(Subject(Message))
@@ -60,7 +56,7 @@ fn init(feed: Feed) {
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir() <> feed.name)
-    |> result.map_error(string.inspect)
+    |> result.replace_error(FileError)
     |> result.try(feed.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
@@ -88,9 +84,7 @@ fn handle_message(message: Message, state: State) {
     PollFeed(self) -> {
       let result = {
         use #(new_state, body) <- result.try(fetch(state))
-        use entries <- result.try(
-          feed.parse(body) |> result.replace_error(ParsingError),
-        )
+        use entries <- result.try(feed.parse(body))
         Ok(State(..new_state, entries: entries))
       }
 
@@ -115,7 +109,7 @@ fn handle_message(message: Message, state: State) {
 
 /// Request the source feed url, honoring the etag/last-modified config from the server,
 /// and saving the response to a local file cache for using on restarts
-fn fetch(state: State) -> Result(#(State, String), PollingError) {
+fn fetch(state: State) -> Result(#(State, String), FeedError) {
   let assert Ok(req) = request.to(state.feed.url)
   let req = request.prepend_header(req, "accept", "application/xml")
   let req = case state.etag {
