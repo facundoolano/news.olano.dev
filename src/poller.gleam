@@ -1,4 +1,7 @@
-import feed.{type Entry, type Feed, Feed}
+import feed.{
+  type Entry, type Feed, type FeedError, Feed, FileError, NotModified,
+  RequestError, ResponseError,
+}
 import gleam/erlang
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
@@ -33,8 +36,7 @@ pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
-  // FIXME use try call here
-  actor.call(feed, GetEntries(_), 10_000)
+  process.try_call(feed, GetEntries(_), 10_000) |> result.unwrap([])
 }
 
 type State {
@@ -53,7 +55,7 @@ fn init(feed: Feed) {
   // otherwise schedule to request now (after initialization, with a random delay)
   let #(entries, interval) =
     simplifile.read(cache_dir() <> feed.name)
-    |> result.map_error(string.inspect)
+    |> result.replace_error(FileError)
     |> result.try(feed.parse)
     |> result.map(fn(entries) { #(entries, poll_interval_ms) })
     |> result.lazy_unwrap(or: fn() { #([], int.random(5000)) })
@@ -79,24 +81,21 @@ fn handle_message(message: Message, state: State) {
       actor.continue(state)
     }
     PollFeed(self) -> {
-      let new_state = case fetch(state) {
-        Ok(#(new_state, body)) ->
-          case feed.parse(body) {
-            Ok(entries) -> {
-              io.println("OK " <> state.feed.url)
-              State(..new_state, entries: entries)
-            }
-            Error(error) -> {
-              io.println("ERROR parsing " <> state.feed.url <> " " <> error)
-              state
-            }
-          }
-        Error("not modified") -> {
-          io.println("Not Modified " <> state.feed.url)
-          state
+      let result = {
+        use #(new_state, body) <- result.try(fetch(state))
+        use entries <- result.try(feed.parse(body))
+        Ok(State(..new_state, entries: entries))
+      }
+
+      let new_state = case result {
+        Ok(new_state) -> {
+          io.println("OK " <> state.feed.url)
+          new_state
         }
         Error(error) -> {
-          io.println("ERROR fetching " <> state.feed.url <> " " <> error)
+          io.println(
+            "ERROR polling " <> state.feed.url <> " " <> string.inspect(error),
+          )
           state
         }
       }
@@ -109,7 +108,7 @@ fn handle_message(message: Message, state: State) {
 
 /// Request the source feed url, honoring the etag/last-modified config from the server,
 /// and saving the response to a local file cache for using on restarts
-fn fetch(state: State) -> Result(#(State, String), String) {
+fn fetch(state: State) -> Result(#(State, String), FeedError) {
   let assert Ok(req) = request.to(state.feed.url)
   let req = request.prepend_header(req, "accept", "application/xml")
   let req = case state.etag {
@@ -122,18 +121,16 @@ fn fetch(state: State) -> Result(#(State, String), String) {
     _ -> req
   }
 
-  let maybe_resp =
+  use resp <- result.try(
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
-    |> result.map_error(string.inspect)
-
-  use resp <- result.try(maybe_resp)
+    |> result.replace_error(RequestError),
+  )
 
   case resp.status {
-    // TODO this is not really an error, introduce proper types to handle gracefully
-    304 -> Error("not modified")
-    status if status >= 400 -> Error("response error " <> int.to_string(status))
+    304 -> Error(NotModified)
+    status if status >= 400 -> Error(ResponseError(status))
     _ -> {
       // cache contents for next time
       let path = cache_dir() <> state.feed.name
