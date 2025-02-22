@@ -17,6 +17,13 @@ const poll_interval_ms = 1_800_000
 pub type Poller =
   Subject(Message)
 
+type PollingError {
+  NotModified
+  RequestError
+  ResponseError(status: Int)
+  ParsingError
+}
+
 pub type Message {
   PollFeed(Subject(Message))
   GetEntries(Subject(List(Entry)))
@@ -81,7 +88,9 @@ fn handle_message(message: Message, state: State) {
     PollFeed(self) -> {
       let result = {
         use #(new_state, body) <- result.try(fetch(state))
-        use entries <- result.try(feed.parse(body))
+        use entries <- result.try(
+          feed.parse(body) |> result.replace_error(ParsingError),
+        )
         Ok(State(..new_state, entries: entries))
       }
 
@@ -91,7 +100,9 @@ fn handle_message(message: Message, state: State) {
           new_state
         }
         Error(error) -> {
-          io.println("ERROR polling " <> state.feed.url <> " " <> error)
+          io.println(
+            "ERROR polling " <> state.feed.url <> " " <> string.inspect(error),
+          )
           state
         }
       }
@@ -104,7 +115,7 @@ fn handle_message(message: Message, state: State) {
 
 /// Request the source feed url, honoring the etag/last-modified config from the server,
 /// and saving the response to a local file cache for using on restarts
-fn fetch(state: State) -> Result(#(State, String), String) {
+fn fetch(state: State) -> Result(#(State, String), PollingError) {
   let assert Ok(req) = request.to(state.feed.url)
   let req = request.prepend_header(req, "accept", "application/xml")
   let req = case state.etag {
@@ -117,18 +128,16 @@ fn fetch(state: State) -> Result(#(State, String), String) {
     _ -> req
   }
 
-  let maybe_resp =
+  use resp <- result.try(
     httpc.configure()
     |> httpc.follow_redirects(True)
     |> httpc.dispatch(req)
-    |> result.map_error(string.inspect)
-
-  use resp <- result.try(maybe_resp)
+    |> result.replace_error(RequestError),
+  )
 
   case resp.status {
-    // TODO this is not really an error, introduce proper types to handle gracefully
-    304 -> Error("not modified")
-    status if status >= 400 -> Error("response error " <> int.to_string(status))
+    304 -> Error(NotModified)
+    status if status >= 400 -> Error(ResponseError(status))
     _ -> {
       // cache contents for next time
       let path = cache_dir() <> state.feed.name
