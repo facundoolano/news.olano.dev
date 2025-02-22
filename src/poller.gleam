@@ -36,8 +36,7 @@ pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
-  // FIXME use try call here
-  actor.call(feed, GetEntries(_), 10_000)
+  process.try_call(feed, GetEntries(_), 10_000) |> result.unwrap([])
 }
 
 type State {
