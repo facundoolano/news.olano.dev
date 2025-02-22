@@ -31,22 +31,23 @@ pub fn start(feeds: List(Feed)) -> Result(process.Pid, Nil) {
 }
 
 fn build_poller_sup(feeds: List(Feed)) -> sup.ChildBuilder {
-  sup.supervisor_child("poller_sup", fn() {
-    // One for one so a feed dying doesn't affect the rest
-    let poller_sup = sup.new(sup.OneForOne)
+  use <- sup.supervisor_child("poller_sup")
+  // One for one so a feed dying doesn't affect the rest
+  let poller_sup = sup.new(sup.OneForOne)
 
-    // for each feed on the input list, create a poller actor, register it to the table
-    // convert it to a child worker, and add it to the poller supervisor
-    list.fold(feeds, poller_sup, fn(sup, feed) {
-      let worker =
-        sup.worker_child(feed.name, fn() {
-          result.map(poller.start(feed), fn(poller) {
-            table.register(feed.name, poller)
-            process.subject_owner(poller)
-          })
-        })
-      sup.add(sup, worker)
-    })
-    |> sup.start_link()
-  })
+  // for each feed on the input list, create a poller actor, register it to the table
+  // convert it to a child worker, and add it to the poller supervisor
+  let poller_sup = {
+    use poller_sup, feed <- list.fold(feeds, poller_sup)
+    let worker = {
+      use <- sup.worker_child(feed.name)
+      use poller <- result.map(poller.start(feed))
+      table.register(feed.name, poller)
+      process.subject_owner(poller)
+    }
+
+    sup.add(poller_sup, worker)
+  }
+
+  sup.start_link(poller_sup)
 }
