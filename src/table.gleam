@@ -2,6 +2,7 @@ import birl
 import birl/duration
 import feed.{type Entry as FeedEntry}
 import gleam/dict
+import gleam/erlang/atom
 import gleam/erlang/process.{type Subject}
 import gleam/int
 import gleam/io
@@ -182,13 +183,13 @@ fn calc_bucket(entries: List(FeedEntry)) -> Int {
 }
 
 @external(erlang, "persistent_term", "put")
-fn put_entries(key: String, value: List(Entry)) -> ok
+fn put_entries(key: String, value: List(Entry)) -> atom.Atom
 
 @external(erlang, "persistent_term", "get")
 fn get_entries(key: String) -> List(Entry)
 
 @external(erlang, "persistent_term", "put")
-fn put_subject(key: String, value: Table) -> ok
+fn put_subject(key: String, value: Table) -> atom.Atom
 
 @external(erlang, "persistent_term", "get")
 fn get_subject(key: String) -> Table
