@@ -169,11 +169,11 @@ fn calc_bucket(entries: List(FeedEntry)) -> Int {
         // once week or less
         n if n <=. 1.0 /. 7.0 -> 1
         // once a day or less
-        n if n <=. 1.0 /. 1.0 -> 2
+        n if n <=. 1.0 -> 2
         // 5 times a day or less
-        n if n <=. 1.0 /. 5.0 -> 3
+        n if n <=. 5.0 -> 3
         // 20 times a day or less
-        n if n <=. 1.0 /. 20.0 -> 4
+        n if n <=. 20.0 -> 4
         // more
         _ -> 5
       }
