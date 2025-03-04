@@ -2,6 +2,8 @@
 
 A little link aggregator built with [Gleam](https://gleam.run/). See it live [here](https://news.olano.dev/).
 
+Development notes in [this blog post](https://olano.dev/blog/gleam-coming-from-erlang/).
+
 ## How it works
 The app periodically pulls links from RSS/Atom feeds listed in a [config file](priv/feeds.csv) and sorts the entries in "inverted frequency order" (the sources that post least frequently show up first, so spammy feeds don't bury infrequent ones). This is a sort of spin-off of my [personal feed reader](https://github.com/facundoolano/feedi).
 
