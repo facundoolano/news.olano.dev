@@ -89,8 +89,12 @@ fn handle_message(message: Message, state: State) {
 
       let new_state = case result {
         Ok(new_state) -> {
-          io.println("OK " <> state.feed.url)
+          io.println("ok " <> state.feed.url)
           new_state
+        }
+        Error(NotModified) -> {
+          io.println("not modified " <> state.feed.url)
+          state
         }
         Error(error) -> {
           io.println(
