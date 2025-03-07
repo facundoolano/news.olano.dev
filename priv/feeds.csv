@@ -1,6 +1,6 @@
 olano.dev,https://olano.dev/feed.xml
-arstechnica,https://feeds.arstechnica.com/arstechnica/features.xml
-hackernews,https://hnrss.org/best
+hntop,https://hnrss.org/newest?points=50
+r/programming,https://www.reddit.com/r/programming/top.rss
 acmqueue,https://queue.acm.org/rss/feeds/queuecontent.xml
 Aphyr,https://aphyr.com/posts.atom
 Buried Treasure,https://buried-treasure.org/feed/
