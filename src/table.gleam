@@ -105,10 +105,11 @@ fn bucketed_entries(feed: Poller) -> List(Entry) {
   let entries =
     poller.entries(feed)
     |> list.filter(fn(e) {
-      // exclude entries over a yer old, and do it before calculating bucket
-      // so a later bloomer (?) doesn't take all the spots
       let delta = birl.difference(birl.now(), e.published)
+      // exclude entries over a yer old, and do it before calculating bucket  so a later bloomer (?) doesn't take all the spots.
+      // also exclude entries that appear to be dated in the future (probably a bug in the date parsing or in the source feed date format)
       duration.blur_to(delta, duration.Month) < cut_off_months
+      || duration.blur_to(delta, duration.Second) < 0
     })
 
   let bucket = calc_bucket(entries)
