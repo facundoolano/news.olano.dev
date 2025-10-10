@@ -15,7 +15,6 @@ Robin Rendle,https://robinrendle.com/feed.xml
 Ted Gioia,https://www.honest-broker.com/feed
 The Third Bit,https://third-bit.com/atom.xml
 The Verge,https://www.theverge.com/rss/features/index.xml
-DISABLED,charity,https://charity.wtf/feed
 ferd.ca,https://ferd.ca/feed.rss
 nicole@web,https://ntietz.com/atom.xml
 openculture,https://www.openculture.com/feed/rss2
@@ -66,7 +65,6 @@ The Go Blog,https://go.dev/blog/feed.atom
 Kadambari,https://kadambari.bearblog.dev/feed/?type=rss
 Eli Bendersky's website,https://eli.thegreenplace.net/feeds/all.atom.xml
 Where's Your Ed At,https://www.wheresyoured.at/rss/
-DISABLED,Horrific/Terrific,https://www.horrific-terrific.tech/feed
 "The Future Now and Then",https://davekarpf.substack.com/feed
 Lil'Log,https://lilianweng.github.io/index.xml
 (think),https://batsov.com/atom.xml
