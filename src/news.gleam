@@ -63,6 +63,7 @@ fn run_server() {
         // for now a single page
         [] -> home()
         ["feed"] -> atom_feed()
+        ["sources"] -> source_feeds()
         _ -> not_found
       }
 
@@ -96,5 +97,15 @@ fn atom_feed() -> Response(ResponseData) {
 
   response.new(200)
   |> response.set_header("Content-Type", "text/xml")
+  |> response.set_body(body)
+}
+
+fn source_feeds() -> Response(ResponseData) {
+  let assert Ok(privdir) = erlang.priv_directory("news")
+  let assert Ok(body_str) = simplifile.read(privdir <> "/feeds.csv")
+  let body = body_str |> bytes_tree.from_string |> mist.Bytes
+
+  response.new(200)
+  |> response.set_header("Content-Type", "text/csv")
   |> response.set_body(body)
 }

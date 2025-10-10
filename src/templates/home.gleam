@@ -84,13 +84,15 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
     </ol>
     <br/>
     <footer>
-    <span>built with <a href=\"https://gleam.run/\">Gleam</a> | </span>
+    <span><a href=\"/feed\">feed</a> |</span>
+    <span><a href=\"/sources\">sources</a> |</span>
     <span>
-        <a href=\"https://github.com/facundoolano/news.olano.dev/\">source code</a> |
+        <a href=\"https://github.com/facundoolano/news.olano.dev/\">code</a> |
     </span>
     <span>
         <a href=\"https://olano.dev/\">home</a>
     </span>
+    <span>built with <a href=\"https://gleam.run/\">Gleam</a> | </span>
     </footer>
     <br/>
   </body>
