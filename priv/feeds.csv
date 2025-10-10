@@ -15,14 +15,12 @@ Robin Rendle,https://robinrendle.com/feed.xml
 Ted Gioia,https://www.honest-broker.com/feed
 The Third Bit,https://third-bit.com/atom.xml
 The Verge,https://www.theverge.com/rss/features/index.xml
-DISABLED,charity,https://charity.wtf/feed
 ferd.ca,https://ferd.ca/feed.rss
 nicole@web,https://ntietz.com/atom.xml
 openculture,https://www.openculture.com/feed/rss2
 public domain review,https://publicdomainreview.org/rss.xml
 remarkable hacking,https://rmkit.dev/feed.xml
 rosenzweig.io,https://rosenzweig.io/feed.xml
-the baffler,https://thebaffler.com/feed
 the garden,https://maggieappleton.com/rss.xml
 Lynn Fisher ,https://lynnandtonic.com/feed.xml
 A List Apart,https://alistapart.com/main/feed/
@@ -49,7 +47,6 @@ Derek Sivers,https://sive.rs/en.atom
 Asterisk,https://asteriskmag.com/feed
 [Citation Needed],https://citationneeded.news/rss/
 from jason,https://www.fromjason.xyz/p/notebook/feed/feed.xml
-CRASH THE ARCADE,https://crashthearcade.com/rss/index.xml
 Herman's blog,https://herman.bearblog.dev/feed/?type=rss
 The History of the Web,https://thehistoryoftheweb.com/feed
 research!rsc,http://research.swtch.com/feed.atom
@@ -66,7 +63,6 @@ The Go Blog,https://go.dev/blog/feed.atom
 Kadambari,https://kadambari.bearblog.dev/feed/?type=rss
 Eli Bendersky's website,https://eli.thegreenplace.net/feeds/all.atom.xml
 Where's Your Ed At,https://www.wheresyoured.at/rss/
-DISABLED,Horrific/Terrific,https://www.horrific-terrific.tech/feed
 "The Future Now and Then",https://davekarpf.substack.com/feed
 Lil'Log,https://lilianweng.github.io/index.xml
 (think),https://batsov.com/atom.xml
@@ -110,3 +106,15 @@ Kagi Small Web,https://kagi.com/smallweb/appreciated
 Armin Ronacher,https://lucumr.pocoo.org/feed.atom
 Sean Voisen,https://sean.voisen.org/atom.xml
 Grumpy Gamer,https://www.grumpygamer.com/rss
+Simon Hojberg,https://hojberg.xyz/rss.xml
+LeadDev,https://leaddev.com/feed
+The Cynical Developer,https://thecynical.dev/index.xml
+Rants on Software Design,https://vladikk.com/index.xml
+steveklabnik,https://steveklabnik.com/feed.xml
+decryption's blog,https://blog.decryption.net.au/feed.xml
+Pivot to AI,https://pivot-to-ai.com/feed/
+Marcus on AI,https://garymarcus.substack.com/feed
+Blood in the Machine,https://www.bloodinthemachine.com/feed
+Culture: An Owner's Manual,https://culture.ghost.io/rss/
+IEEE Spectrum,https://spectrum.ieee.org/feeds/feed.rss
+Cybercultural,https://cybercultural.com/feed.xml

@@ -1,6 +1,6 @@
 import feed.{
-  type Entry, type Feed, type FeedError, Feed, FileError, NotModified,
-  RequestError, ResponseError,
+  type Entry, type Feed, type FeedError, FileError, NotModified, RequestError,
+  ResponseError,
 }
 import gleam/erlang
 import gleam/erlang/process.{type Subject}
@@ -36,7 +36,7 @@ pub fn start(feed: Feed) -> Result(Poller, actor.StartError) {
 }
 
 pub fn entries(feed: Subject(Message)) -> List(Entry) {
-  process.try_call(feed, GetEntries(_), 10_000) |> result.unwrap([])
+  process.try_call(feed, GetEntries, 10_000) |> result.unwrap([])
 }
 
 type State {
