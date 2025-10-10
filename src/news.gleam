@@ -106,6 +106,7 @@ fn source_feeds() -> Response(ResponseData) {
   let body = body_str |> bytes_tree.from_string |> mist.Bytes
 
   response.new(200)
-  |> response.set_header("Content-Type", "text/csv")
+  |> response.set_header("Content-Type", "text/plain")
+  |> response.set_header("Content-Disposition", "inline; filename=sources.csv")
   |> response.set_body(body)
 }
