@@ -11,10 +11,10 @@
     <id>https://news.olano.dev/feed</id>
     <title type="html">news.olano.dev</title>
     <author><name>Facundo Olano</name></author>
-    {% for entry in entries %}
+    {% for entry in entries %} 
         <entry>
-            <title type="html">{{ string.replace(entry.title, "&", "&amp;") }}</title>
-            <link href="{{ entry.url }}" rel="alternate" type="text/html" title="{{ string.replace(entry.title, "&", "&amp;") }}"/>
+            <title type="html">{{ feed.escape_xml(entry.title) }}</title>
+            <link href="{{ entry.url }}" rel="alternate" type="text/html" title="{{ feed.escape_xml(entry.title) }}"/>
             <published>{{ birl.to_naive(entry.published) }}Z</published>
             <updated>{{ birl.to_naive(entry.published) }}Z</updated>
             <id>{{ entry.url }}</id>

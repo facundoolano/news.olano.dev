@@ -34,12 +34,11 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
       let tree =
         string_tree.append(
           tree,
-          "
+          " 
         <entry>
             <title type=\"html\">",
         )
-      let tree =
-        string_tree.append(tree, string.replace(entry.title, "&", "&amp;"))
+      let tree = string_tree.append(tree, feed.escape_xml(entry.title))
       let tree =
         string_tree.append(
           tree,
@@ -52,8 +51,7 @@ pub fn render_tree(entries entries: List(Entry)) -> StringTree {
           tree,
           "\" rel=\"alternate\" type=\"text/html\" title=\"",
         )
-      let tree =
-        string_tree.append(tree, string.replace(entry.title, "&", "&amp;"))
+      let tree = string_tree.append(tree, feed.escape_xml(entry.title))
       let tree =
         string_tree.append(
           tree,

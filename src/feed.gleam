@@ -32,6 +32,16 @@ pub fn domain(entry: Entry) -> String {
   string.replace(host, "www.", "")
 }
 
+pub fn escape_xml(text: String) -> String {
+  // maybe better off somewhere else, but don't feel like adding an utils package just for this
+  text
+  |> string.replace("&", "&amp;")
+  |> string.replace("<", "&lt;")
+  |> string.replace(">", "&gt;")
+  |> string.replace("\"", "&quot;")
+  |> string.replace("'", "&apos;")
+}
+
 /// Given an xml document of an Atom or RSS feed, parse it into a list of entries.
 pub fn parse(body: String) -> Result(List(Entry), FeedError) {
   case parse_feed(body) {
