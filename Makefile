@@ -14,4 +14,4 @@ build:
 	gleam export erlang-shipment && rm -rf rm build/erlang-shipment/news/priv/feedcache/
 
 templates:
-	matcha && gleam format src
+	matcha --verbose && gleam format src
